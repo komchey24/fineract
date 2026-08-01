@@ -90,8 +90,8 @@ jobs:
           FINERACT_DEFAULT_TENANTDB_UID: "root"
           FINERACT_HIKARI_DRIVER_SOURCE_CLASS_NAME: "org.postgresql.Driver"
           FINERACT_HIKARI_JDBC_URL: "jdbc:postgresql://localhost:5432/fineract_tenants"
-          FINERACT_HIKARI_PASSWORD: "postgres"
-          FINERACT_HIKARI_USERNAME: "root"
+          FINERACT_HIKARI_PASSWORD: "root"
+          FINERACT_HIKARI_USERNAME: "postgres"
           SPRING_PROFILES_ACTIVE: "liquibase-only"
         run:
           ./gradlew --no-daemon fineract-provider:bootRun -x buildJavaSdk
