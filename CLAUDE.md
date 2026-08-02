@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Apache Fineract — an open-source core banking platform (REST API only, no UI). This repo is a fork (`komchey24/fineract`) of `apache/fineract`; the primary integration branch is `develop`. Java 21, Spring Boot, Gradle multi-module build. PostgreSQL is the recommended database (MySQL/MariaDB are deprecated).
 
+The Angular frontend (Mifos web-app fork) that consumes this API lives locally at `/Users/chanhengseang/Documents/repo/web-app-kc24`.
+
 Before reporting security findings, consult `SECURITY.md` for the threat model and known non-findings (see `AGENTS.md`).
 
 ## Common Commands
