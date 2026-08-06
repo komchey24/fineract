@@ -30,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -48,6 +49,7 @@ import org.apache.fineract.infrastructure.core.domain.JdbcSupport;
 import org.apache.fineract.infrastructure.core.exception.ErrorHandler;
 import org.apache.fineract.infrastructure.core.exception.PlatformDataIntegrityException;
 import org.apache.fineract.infrastructure.core.service.database.DatabaseSpecificSQLGenerator;
+import org.apache.fineract.infrastructure.core.service.database.DatabaseTypeResolver;
 import org.apache.fineract.infrastructure.core.service.database.JdbcJavaType;
 import org.apache.fineract.infrastructure.dataqueries.data.GenericResultsetData;
 import org.apache.fineract.infrastructure.dataqueries.data.ReportData;
@@ -69,6 +71,7 @@ import org.openpdf.text.pdf.PdfPTable;
 import org.openpdf.text.pdf.PdfWriter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.SqlParameterValue;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
 import org.springframework.stereotype.Service;
 
@@ -94,6 +97,7 @@ public class ReadReportingServiceImpl implements ReadReportingService {
     private final DatabaseSpecificSQLGenerator sqlGenerator;
     private final FineractProperties fineractProperties;
     private final ReportParameterTypeResolver reportParameterTypeResolver;
+    private final DatabaseTypeResolver databaseTypeResolver;
 
     @Override
     public StreamingOutput retrieveReportCSV(final String name, final String type, final Map<String, String> queryParams) {
@@ -162,7 +166,32 @@ public class ReadReportingServiceImpl implements ReadReportingService {
         if ("DATE".equalsIgnoreCase(formatType)) {
             return java.sql.Date.valueOf(value);
         }
+        if (formatType == null) {
+            return untypedParamValue(value);
+        }
         return value;
+    }
+
+    /**
+     * Binds a parameter whose declared format type is unknown, letting the database infer the type from the column it
+     * is compared against.
+     *
+     * <p>
+     * Parameter-type lookups ({@code ?parameterType=true}) are named after a {@code stretchy_parameter} row, so
+     * {@link ReportParameterTypeResolver#loadParamFormatTypes(String)} — which only searches {@code stretchy_report} —
+     * returns nothing for them. Sending such a value as a plain {@code String} binds it as {@code varchar}, and
+     * PostgreSQL then rejects comparisons like {@code m_office.id = ?} with {@code operator does not exist: bigint =
+     * character varying} (SQLSTATE 42883), surfacing as a {@code BadSqlGrammarException}. Binding as
+     * {@link Types#OTHER} makes the driver send the value with an unspecified type OID so the server coerces it,
+     * matching the behaviour of the literal substitution this code replaced — without concatenating user input into the
+     * SQL.
+     *
+     * <p>
+     * MySQL/MariaDB coerce between {@code varchar} and numeric types implicitly, and their driver does not accept
+     * {@code Types.OTHER} for a {@code String}, so the value is passed through unchanged there.
+     */
+    private Object untypedParamValue(final String value) {
+        return databaseTypeResolver.isPostgreSQL() ? new SqlParameterValue(Types.OTHER, value) : value;
     }
 
     private PreparedQuery buildPreparedQuery(final String name, final Map<String, String> queryParams, final String sql,
@@ -282,10 +311,20 @@ public class ReadReportingServiceImpl implements ReadReportingService {
         // Use parameterized query - name parameter is safely handled by JDBC
         final SqlRowSet rs = this.jdbcTemplate.queryForRowSet(inputSqlWrapped, name);
 
-        if (rs.next() && rs.getString("the_sql") != null) {
+        if (rs.next() && isRunnableSql(rs.getString("the_sql"))) {
             return rs.getString("the_sql");
         }
         throw new ReportNotFoundException(name);
+    }
+
+    /**
+     * A report row carries no runnable SQL when the column is NULL, blank, or holds the literal placeholder
+     * {@code (NULL)} left behind by the seed data for reports that exist only as listing entries (e.g.
+     * {@code FullReportList}, {@code ReportCategoryList}). Executing that literal produces a database syntax error that
+     * surfaces as an opaque HTTP 403; treating it as absent yields a truthful "report not found" instead.
+     */
+    private boolean isRunnableSql(final String sql) {
+        return sql != null && !sql.isBlank() && !"(NULL)".equals(sql.trim());
     }
 
     /**
