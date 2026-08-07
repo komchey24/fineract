@@ -775,6 +775,14 @@ public class LoanAssemblerImpl implements LoanAssembler {
             loan.setFixedEmiAmount(null);
         }
 
+        // A manual installment amount adjustment is only meaningful against a specific principal and term. Once the
+        // application is modified in a way that regenerates the schedule, drop it and make the officer re-enter it -
+        // silently keeping a stale amount could make the next approval fail and block the account.
+        if (loan.getAdjustedInstallmentAmount() != null && Boolean.TRUE.equals(changes.get(Loan.RECALCULATE_LOAN_SCHEDULE))) {
+            loan.setAdjustedInstallmentAmount(null);
+            changes.put(LoanApiConstants.installmentAmountParameterName, null);
+        }
+
         if (command.isChangeInBigDecimalParameterNamed(LoanApiConstants.fixedPrincipalPercentagePerInstallmentParamName,
                 loan.getFixedPrincipalPercentagePerInstallment())) {
             loan.setFixedPrincipalPercentagePerInstallment(

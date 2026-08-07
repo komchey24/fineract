@@ -1196,6 +1196,8 @@ final class LoansApiResourceSwagger {
         public BigDecimal proposedPrincipal;
         @Schema(example = "200.000000")
         public BigDecimal netDisbursalAmount;
+        @Schema(description = "Officer supplied target total due (principal + interest) per installment, FLAT loans only", example = "105700")
+        public BigDecimal adjustedInstallmentAmount;
         @Schema(example = "12")
         public Integer termFrequency;
         public GetLoansLoanIdTermPeriodFrequencyType termPeriodFrequencyType;
@@ -1771,6 +1773,8 @@ final class LoansApiResourceSwagger {
         public String externalId;
         @Schema(example = "5000.33")
         public BigDecimal transactionAmount;
+        @Schema(description = "Target total due (principal + interest) for every installment, used by the adjustInstallmentAmount command", example = "105700")
+        public BigDecimal installmentAmount;
         @Schema(example = "Description of disbursement details.")
         public String note;
         @Schema(example = "28 June 2022")

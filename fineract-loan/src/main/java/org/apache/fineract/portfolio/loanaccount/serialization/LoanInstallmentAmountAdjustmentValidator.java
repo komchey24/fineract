@@ -16,21 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.portfolio.loanaccount.loanschedule.service;
+package org.apache.fineract.portfolio.loanaccount.serialization;
 
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
-import org.apache.fineract.infrastructure.core.data.CommandProcessingResult;
 
-public interface LoanScheduleWritePlatformService {
+public interface LoanInstallmentAmountAdjustmentValidator {
 
-    CommandProcessingResult addLoanScheduleVariations(Long loanId, JsonCommand command);
-
-    CommandProcessingResult deleteLoanScheduleVariations(Long loanId);
-
-    /**
-     * Sets (or clears) the officer supplied installment total on a not yet disbursed FLAT loan and regenerates the
-     * repayment schedule so that every installment's total due equals that amount, with interest back-solved as
-     * {@code installmentAmount - principal}.
-     */
-    CommandProcessingResult adjustInstallmentAmount(Long loanId, JsonCommand command);
+    void validateInstallmentAmountAdjustment(JsonCommand command);
 }

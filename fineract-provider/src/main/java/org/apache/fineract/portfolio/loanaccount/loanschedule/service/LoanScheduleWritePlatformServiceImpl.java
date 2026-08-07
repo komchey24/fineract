@@ -18,6 +18,7 @@
  */
 package org.apache.fineract.portfolio.loanaccount.loanschedule.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,11 +31,13 @@ import org.apache.fineract.infrastructure.core.data.CommandProcessingResultBuild
 import org.apache.fineract.infrastructure.event.business.domain.loan.LoanScheduleVariationsAddedBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.domain.loan.LoanScheduleVariationsDeletedBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.service.BusinessEventNotifierService;
+import org.apache.fineract.portfolio.loanaccount.api.LoanApiConstants;
 import org.apache.fineract.portfolio.loanaccount.data.LoanTermVariationsData;
 import org.apache.fineract.portfolio.loanaccount.data.ScheduleGeneratorDTO;
 import org.apache.fineract.portfolio.loanaccount.domain.Loan;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanAccountService;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTermVariations;
+import org.apache.fineract.portfolio.loanaccount.serialization.LoanInstallmentAmountAdjustmentValidator;
 import org.apache.fineract.portfolio.loanaccount.service.LoanAccrualsProcessingService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanAssembler;
 import org.apache.fineract.portfolio.loanaccount.service.LoanScheduleService;
@@ -54,6 +57,7 @@ public class LoanScheduleWritePlatformServiceImpl implements LoanScheduleWritePl
     private final LoanAccrualsProcessingService loanAccrualsProcessingService;
     private final LoanScheduleService loanScheduleService;
     private final LoanAccountService loanAccountService;
+    private final LoanInstallmentAmountAdjustmentValidator loanInstallmentAmountAdjustmentValidator;
 
     @Override
     public CommandProcessingResult addLoanScheduleVariations(final Long loanId, final JsonCommand command) {
@@ -105,6 +109,39 @@ public class LoanScheduleWritePlatformServiceImpl implements LoanScheduleWritePl
         loanAccountService.saveLoanWithDataIntegrityViolationChecks(loan);
         businessEventNotifierService.notifyPostBusinessEvent(new LoanScheduleVariationsDeletedBusinessEvent(loan));
         return new CommandProcessingResultBuilder() //
+                .withLoanId(loanId) //
+                .with(changes) //
+                .build();
+    }
+
+    @Override
+    public CommandProcessingResult adjustInstallmentAmount(final Long loanId, final JsonCommand command) {
+        loanInstallmentAmountAdjustmentValidator.validateInstallmentAmountAdjustment(command);
+
+        final Loan loan = loanAssembler.assembleFrom(loanId);
+        final Map<String, Object> changes = new HashMap<>();
+        changes.put("previousInstallmentAmount", loan.getAdjustedInstallmentAmount());
+
+        final BigDecimal installmentAmount = command.bigDecimalValueOfParameterNamed(LoanApiConstants.installmentAmountParameterName);
+        loan.setAdjustedInstallmentAmount(installmentAmount);
+        changes.put(LoanApiConstants.installmentAmountParameterName, installmentAmount);
+        changes.put(LoanApiConstants.localeParameterName, command.locale());
+
+        // Regenerating inside the command transaction is what makes this safe: if any period would end up with a
+        // negative interest portion the generator throws and the whole command - including the persisted amount -
+        // rolls back.
+        final LocalDate recalculateFrom = null;
+        final ScheduleGeneratorDTO scheduleGeneratorDTO = loanUtilService.buildScheduleGeneratorDTO(loan, recalculateFrom);
+        loanScheduleService.regenerateRepaymentSchedule(loan, scheduleGeneratorDTO);
+        loanAccountService.saveLoanWithDataIntegrityViolationChecks(loan);
+
+        return new CommandProcessingResultBuilder() //
+                .withCommandId(command.commandId()) //
+                .withEntityId(loan.getId()) //
+                .withEntityExternalId(loan.getExternalId()) //
+                .withOfficeId(loan.getOfficeId()) //
+                .withClientId(loan.getClientId()) //
+                .withGroupId(loan.getGroupId()) //
                 .withLoanId(loanId) //
                 .with(changes) //
                 .build();

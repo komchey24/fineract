@@ -199,6 +199,9 @@ public class LoanAccountData {
 
     private BigDecimal fixedEmiAmount;
 
+    /** Officer supplied target total due (principal + interest) per installment, FLAT loans only. */
+    private BigDecimal adjustedInstallmentAmount;
+
     private BigDecimal maxOutstandingLoanBalance;
 
     private Boolean canDisburse;
