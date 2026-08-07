@@ -80,6 +80,23 @@ public class LoanAdjustInstallmentAmountTest extends FeignLoanTestBase {
     }
 
     @Test
+    public void installmentAmountSuppliedOnTheApplicationIsHonouredImmediately() {
+        runAt("01 February 2026", () -> {
+            // The officer types the target on the application form itself, so the very first generated schedule
+            // already carries it - no submit-then-correct round trip.
+            final Long loanId = applyLoan(InterestType.FLAT, BigDecimal.valueOf(TARGET_INSTALLMENT));
+
+            verifyAdjustedSchedule(loanId);
+            assertEquals(0, BigDecimal.valueOf(TARGET_INSTALLMENT).compareTo(getLoanDetails(loanId).getAdjustedInstallmentAmount()));
+
+            // Still survives the regenerations that follow.
+            approveLoan(loanId, LoanRequestBuilders.approveLoan(PRINCIPAL, "01 February 2026"));
+            disburseLoan(loanId, BigDecimal.valueOf(PRINCIPAL), "01 February 2026");
+            verifyAdjustedSchedule(loanId);
+        });
+    }
+
+    @Test
     public void adjustmentSurvivesUndoApproval() {
         runAt("01 February 2026", () -> {
             final Long loanId = applyFlatLoan();
@@ -144,6 +161,10 @@ public class LoanAdjustInstallmentAmountTest extends FeignLoanTestBase {
     }
 
     private Long applyLoan(final int interestType) {
+        return applyLoan(interestType, null);
+    }
+
+    private Long applyLoan(final int interestType, final BigDecimal installmentAmount) {
         final PostLoanProductsRequest product = createOnePeriod30DaysPeriodicAccrualProduct(MONTHLY_FLAT_RATE)//
                 .multiDisburseLoan(false)//
                 .disallowExpectedDisbursements(false)//
@@ -171,7 +192,8 @@ public class LoanAdjustInstallmentAmountTest extends FeignLoanTestBase {
                 .loanTermFrequencyType(RepaymentFrequencyType.MONTHS)//
                 .interestRatePerPeriod(BigDecimal.valueOf(MONTHLY_FLAT_RATE))//
                 .interestType(interestType)//
-                .amortizationType(AmortizationType.EQUAL_INSTALLMENTS);
+                .amortizationType(AmortizationType.EQUAL_INSTALLMENTS)//
+                .installmentAmount(installmentAmount);
 
         return applyForLoan(applicationRequest);
     }

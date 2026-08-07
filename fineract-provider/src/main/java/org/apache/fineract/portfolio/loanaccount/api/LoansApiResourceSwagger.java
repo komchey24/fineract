@@ -1411,6 +1411,8 @@ final class LoansApiResourceSwagger {
         public Boolean enableAutoRepaymentForDownPayment;
         @Schema(example = "10.00")
         public BigDecimal fixedEmiAmount;
+        @Schema(description = "Optional target total due (principal + interest) for every installment, FLAT loans only. Interest is back-solved as installmentAmount - principal.", example = "105700")
+        public BigDecimal installmentAmount;
         @Schema(example = "false")
         public Boolean interestRecognitionOnDisbursementDate;
         @Schema(example = "false")
@@ -1555,6 +1557,8 @@ final class LoansApiResourceSwagger {
 
         private PutLoansLoanIdRequest() {}
 
+        @Schema(description = "Optional target total due (principal + interest) for every installment, FLAT loans only. Interest is back-solved as installmentAmount - principal.", example = "105700")
+        public BigDecimal installmentAmount;
         @Schema(example = "en")
         public String locale;
         @Schema(example = "dd MMMM yyyy")

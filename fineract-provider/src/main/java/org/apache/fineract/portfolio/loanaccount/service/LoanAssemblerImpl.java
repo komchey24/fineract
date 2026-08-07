@@ -286,6 +286,11 @@ public class LoanAssemblerImpl implements LoanAssembler {
             throw new IllegalStateException("No loan application exists for either a client or group (or both).");
         }
 
+        // Persist the officer supplied installment total so later regenerations (approve, disburse) reproduce the same
+        // schedule. The generated model above already honours it via LoanScheduleAssembler.
+        loanApplication.setAdjustedInstallmentAmount(
+                this.fromApiJsonHelper.extractBigDecimalWithLocaleNamed(LoanApiConstants.installmentAmountParameterName, element));
+
         loanSchedule.updateLoanSchedule(loanApplication, loanScheduleModel);
 
         copyAdvancedPaymentRulesIfApplicable(transactionProcessingStrategyCode, loanProduct, loanApplication);
@@ -775,10 +780,20 @@ public class LoanAssemblerImpl implements LoanAssembler {
             loan.setFixedEmiAmount(null);
         }
 
-        // A manual installment amount adjustment is only meaningful against a specific principal and term. Once the
-        // application is modified in a way that regenerates the schedule, drop it and make the officer re-enter it -
-        // silently keeping a stale amount could make the next approval fail and block the account.
-        if (loan.getAdjustedInstallmentAmount() != null && Boolean.TRUE.equals(changes.get(Loan.RECALCULATE_LOAN_SCHEDULE))) {
+        // An explicitly supplied installment total always wins - the officer is restating it against the terms they
+        // are submitting right now.
+        if (command.parameterExists(LoanApiConstants.installmentAmountParameterName)) {
+            final BigDecimal installmentAmount = command.bigDecimalValueOfParameterNamed(LoanApiConstants.installmentAmountParameterName);
+            if (command.isChangeInBigDecimalParameterNamed(LoanApiConstants.installmentAmountParameterName,
+                    loan.getAdjustedInstallmentAmount())) {
+                loan.setAdjustedInstallmentAmount(installmentAmount);
+                changes.put(LoanApiConstants.installmentAmountParameterName, installmentAmount);
+                changes.put(Loan.RECALCULATE_LOAN_SCHEDULE, true);
+            }
+        } else if (loan.getAdjustedInstallmentAmount() != null && Boolean.TRUE.equals(changes.get(Loan.RECALCULATE_LOAN_SCHEDULE))) {
+            // Otherwise a previously stored amount is only meaningful against the principal and term it was entered
+            // for. If those changed, drop it and make the officer re-enter it - silently keeping a stale amount could
+            // make the next approval fail and block the account.
             loan.setAdjustedInstallmentAmount(null);
             changes.put(LoanApiConstants.installmentAmountParameterName, null);
         }
