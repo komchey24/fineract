@@ -334,6 +334,14 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
     @Column(name = "fixed_emi_amount", scale = 6, precision = 19)
     private BigDecimal fixedEmiAmount;
 
+    /**
+     * Officer-supplied target total due (principal + interest) for every installment, FLAT loans only. When set, the
+     * schedule generator back-solves interest as {@code interest = adjustedInstallmentAmount - principal}.
+     */
+    @Setter
+    @Column(name = "adjusted_installment_amount", scale = 6, precision = 19)
+    private BigDecimal adjustedInstallmentAmount;
+
     @Setter
     @Column(name = "max_outstanding_loan_balance", scale = 6, precision = 19)
     private BigDecimal maxOutstandingLoanBalance;

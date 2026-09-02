@@ -1196,6 +1196,8 @@ final class LoansApiResourceSwagger {
         public BigDecimal proposedPrincipal;
         @Schema(example = "200.000000")
         public BigDecimal netDisbursalAmount;
+        @Schema(description = "Officer supplied target total due (principal + interest) per installment, FLAT loans only", example = "105700")
+        public BigDecimal adjustedInstallmentAmount;
         @Schema(example = "12")
         public Integer termFrequency;
         public GetLoansLoanIdTermPeriodFrequencyType termPeriodFrequencyType;
@@ -1409,6 +1411,8 @@ final class LoansApiResourceSwagger {
         public Boolean enableAutoRepaymentForDownPayment;
         @Schema(example = "10.00")
         public BigDecimal fixedEmiAmount;
+        @Schema(description = "Optional target total due (principal + interest) for every installment, FLAT loans only. Interest is back-solved as installmentAmount - principal.", example = "105700")
+        public BigDecimal installmentAmount;
         @Schema(example = "false")
         public Boolean interestRecognitionOnDisbursementDate;
         @Schema(example = "false")
@@ -1553,6 +1557,8 @@ final class LoansApiResourceSwagger {
 
         private PutLoansLoanIdRequest() {}
 
+        @Schema(description = "Optional target total due (principal + interest) for every installment, FLAT loans only. Interest is back-solved as installmentAmount - principal.", example = "105700")
+        public BigDecimal installmentAmount;
         @Schema(example = "en")
         public String locale;
         @Schema(example = "dd MMMM yyyy")
@@ -1771,6 +1777,8 @@ final class LoansApiResourceSwagger {
         public String externalId;
         @Schema(example = "5000.33")
         public BigDecimal transactionAmount;
+        @Schema(description = "Target total due (principal + interest) for every installment, used by the adjustInstallmentAmount command", example = "105700")
+        public BigDecimal installmentAmount;
         @Schema(example = "Description of disbursement details.")
         public String note;
         @Schema(example = "28 June 2022")

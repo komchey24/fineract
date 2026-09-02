@@ -828,7 +828,8 @@ public class LoanReadPlatformServiceImpl implements LoanReadPlatformService, Loa
                     + " l.total_waived_derived as totalWaived, l.total_writtenoff_derived as totalWrittenOff,"
                     + " l.writeoff_reason_cv_id as writeoffReasonId, codev.code_value as writeoffReason,"
                     + " l.total_outstanding_derived as totalOutstanding, l.total_overpaid_derived as totalOverpaid,"
-                    + " l.fixed_emi_amount as fixedEmiAmount, l.max_outstanding_loan_balance as outstandingLoanBalance,"
+                    + " l.fixed_emi_amount as fixedEmiAmount, l.adjusted_installment_amount as adjustedInstallmentAmount,"
+                    + " l.max_outstanding_loan_balance as outstandingLoanBalance,"
                     + " l.loan_sub_status_id as loanSubStatusId, la.principal_overdue_derived as principalOverdue, l.is_fraud as isFraud, "
                     + " la.interest_overdue_derived as interestOverdue, la.fee_charges_overdue_derived as feeChargesOverdue,"
                     + " la.penalty_charges_overdue_derived as penaltyChargesOverdue, la.total_overdue_derived as totalOverdue,"
@@ -1148,6 +1149,7 @@ public class LoanReadPlatformServiceImpl implements LoanReadPlatformService, Loa
             final Integer loanCounter = JdbcSupport.getInteger(rs, "loanCounter");
             final Integer loanProductCounter = JdbcSupport.getInteger(rs, "loanProductCounter");
             final BigDecimal fixedEmiAmount = JdbcSupport.getBigDecimalDefaultToNullIfZero(rs, "fixedEmiAmount");
+            final BigDecimal adjustedInstallmentAmount = JdbcSupport.getBigDecimalDefaultToNullIfZero(rs, "adjustedInstallmentAmount");
             final Boolean isNPA = rs.getBoolean("isNPA");
 
             final int daysInMonth = JdbcSupport.getInteger(rs, "daysInMonth");
@@ -1280,7 +1282,7 @@ public class LoanReadPlatformServiceImpl implements LoanReadPlatformService, Loa
                     chargeOffBehaviour.getValueAsStringEnumOptionData(), interestRecognitionOnDisbursementDate, allowFullTermForTranche,
                     daysInYearCustomStrategy, enableIncomeCapitalization, capitalizedIncomeCalculationType, capitalizedIncomeStrategy,
                     capitalizedIncomeType, enableBuyDownFee, buyDownFeeCalculationType, buyDownFeeStrategy, buyDownFeeIncomeType,
-                    merchantBuyDownFee);
+                    merchantBuyDownFee).setAdjustedInstallmentAmount(adjustedInstallmentAmount);
         }
     }
 

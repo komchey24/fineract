@@ -55,6 +55,7 @@ import org.apache.fineract.portfolio.loanaccount.domain.LoanCapitalizedIncomeCal
 import org.apache.fineract.portfolio.loanaccount.domain.LoanCapitalizedIncomeStrategy;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanCapitalizedIncomeType;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanChargeOffBehaviour;
+import org.apache.fineract.portfolio.loanaccount.loanschedule.exception.LoanAdjustedInstallmentAmountTooLowException;
 import org.apache.fineract.portfolio.loanproduct.data.LoanConfigurationDetails;
 import org.apache.fineract.portfolio.loanproduct.domain.AmortizationMethod;
 import org.apache.fineract.portfolio.loanproduct.domain.ILoanConfigurationDetails;
@@ -215,6 +216,15 @@ public final class LoanApplicationTerms {
     private BigDecimal principalThresholdForLastInstalment;
     @Getter
     private Integer installmentAmountInMultiplesOf;
+
+    /**
+     * Officer-supplied target total due (principal + interest) for every installment, FLAT loans only. When set,
+     * interest is back-solved as {@code interest = adjustedInstallmentAmount - principal} instead of being derived from
+     * the nominal flat rate.
+     */
+    @Getter
+    @Setter
+    private BigDecimal adjustedInstallmentAmount;
 
     @Getter
     private LoanPreCloseInterestCalculationStrategy preClosureInterestCalculationStrategy;
@@ -945,11 +955,47 @@ public final class LoanApplicationTerms {
         return adjusted;
     }
 
+    public boolean isInstallmentAmountAdjusted() {
+        return this.adjustedInstallmentAmount != null && this.adjustedInstallmentAmount.compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    /**
+     * Back-solves the interest portion of a period from the officer-supplied installment total:
+     * {@code interest = adjustedInstallmentAmount - principal}.
+     * <p>
+     * Must be called with the <em>final</em> principal for the period, i.e. after
+     * {@link #adjustPrincipalIfLastRepaymentPeriod(Money, Money, int)} has been applied, otherwise the last installment
+     * total would not land exactly on the requested amount.
+     */
+    public Money calculateAdjustedInterestForPeriod(final Money principalForThisPeriod) {
+        final Money interest = Money.of(getCurrency(), this.adjustedInstallmentAmount).minus(principalForThisPeriod);
+        if (interest.isLessThanZero()) {
+            throw new LoanAdjustedInstallmentAmountTooLowException(this.adjustedInstallmentAmount, principalForThisPeriod.getAmount());
+        }
+        return interest;
+    }
+
+    /**
+     * Total interest implied by the installment adjustment: {@code adjustedInstallmentAmount * numberOfRepayments -
+     * principal}.
+     */
+    public Money calculateAdjustedTotalInterestCharged() {
+        return Money.of(getCurrency(), this.adjustedInstallmentAmount).multipliedBy((long) this.actualNumberOfRepayments)
+                .minus(this.principal);
+    }
+
     /**
      * Calculates the total interest to be charged on loan taking into account grace settings.
      *
      */
     public Money calculateTotalInterestCharged(final PaymentPeriodsInOneYearCalculator calculator, final MathContext mc) {
+
+        if (isInstallmentAmountAdjusted()) {
+            // Overridden so the loan level total agrees with the per period back-solved interest. Without this,
+            // adjustInterestIfLastRepaymentPeriod would drag the final period back towards the nominal flat total and
+            // break the "every installment equals the requested amount" invariant.
+            return calculateAdjustedTotalInterestCharged();
+        }
 
         Money totalInterestCharged = this.principal.zero();
 

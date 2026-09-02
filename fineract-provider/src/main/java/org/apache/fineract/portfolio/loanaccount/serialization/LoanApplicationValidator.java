@@ -164,8 +164,8 @@ public final class LoanApplicationValidator {
             LoanApiConstants.calendarIdParameterName, // optional
             LoanApiConstants.syncDisbursementWithMeetingParameterName, // optional
             LoanApiConstants.linkAccountIdParameterName, LoanApiConstants.disbursementDataParameterName,
-            LoanApiConstants.fixedEmiAmountParameterName, LoanApiConstants.maxOutstandingBalanceParameterName,
-            LoanProductConstants.GRACE_ON_ARREARS_AGEING_PARAMETER_NAME,
+            LoanApiConstants.fixedEmiAmountParameterName, LoanApiConstants.installmentAmountParameterName,
+            LoanApiConstants.maxOutstandingBalanceParameterName, LoanProductConstants.GRACE_ON_ARREARS_AGEING_PARAMETER_NAME,
             LoanApiConstants.createStandingInstructionAtDisbursementParameterName, LoanApiConstants.isTopup, LoanApiConstants.loanIdToClose,
             LoanApiConstants.datatables, LoanApiConstants.isEqualAmortizationParam, LoanProductConstants.RATES_PARAM_NAME,
             LoanApiConstants.applicationId, // glim specific
@@ -627,6 +627,8 @@ public final class LoanApplicationValidator {
                 baseDataValidator.reset().parameter(LoanApiConstants.fixedEmiAmountParameterName).value(emiAmount).ignoreIfNull()
                         .positiveAmount();
             }
+            validateAdjustedInstallmentAmount(element, loanProduct, baseDataValidator);
+
             if (this.fromApiJsonHelper.parameterExists(LoanApiConstants.maxOutstandingBalanceParameterName, element)) {
                 final BigDecimal maxOutstandingBalance = this.fromApiJsonHelper
                         .extractBigDecimalWithLocaleNamed(LoanApiConstants.maxOutstandingBalanceParameterName, element);
@@ -1382,6 +1384,8 @@ public final class LoanApplicationValidator {
                 baseDataValidator.reset().parameter(LoanApiConstants.fixedEmiAmountParameterName).value(emiAnount).ignoreIfNull()
                         .positiveAmount();
             }
+
+            validateAdjustedInstallmentAmount(element, loanProduct, baseDataValidator);
 
             if (this.fromApiJsonHelper.parameterExists(LoanApiConstants.maxOutstandingBalanceParameterName, element)) {
                 final BigDecimal maxOutstandingBalance = this.fromApiJsonHelper
@@ -2262,6 +2266,69 @@ public final class LoanApplicationValidator {
                 .add(DataValidatorBuilder.buildValidationParameterApiError("loans", parameterName, ".cannot.be.blank", "is mandatory.", 0));
         throw new PlatformApiDataValidationException("validation.msg.validation.errors.exist", "Validation errors exist.",
                 dataValidationErrors);
+    }
+
+    /**
+     * Validates the optional officer supplied installment total (principal + interest per installment) carried on the
+     * loan application. The schedule generator back-solves interest from it, which is only well defined for a plain
+     * FLAT loan, so anything outside that shape is rejected here rather than silently producing a schedule that does
+     * not honour the requested amount.
+     */
+    private void validateAdjustedInstallmentAmount(final JsonElement element, final LoanProduct loanProduct,
+            final DataValidatorBuilder baseDataValidator) {
+        if (!this.fromApiJsonHelper.parameterExists(LoanApiConstants.installmentAmountParameterName, element)) {
+            return;
+        }
+        final BigDecimal installmentAmount = this.fromApiJsonHelper
+                .extractBigDecimalWithLocaleNamed(LoanApiConstants.installmentAmountParameterName, element);
+        if (installmentAmount == null) {
+            return;
+        }
+
+        baseDataValidator.reset().parameter(LoanApiConstants.installmentAmountParameterName).value(installmentAmount).positiveAmount();
+
+        Integer interestType = this.fromApiJsonHelper.extractIntegerWithLocaleNamed(LoanApiConstants.interestTypeParameterName, element);
+        if (interestType == null) {
+            interestType = loanProduct.getLoanProductRelatedDetail().getInterestMethod().getValue();
+        }
+        final boolean isEqualAmortization = loanProduct.getLoanProductRelatedDetail().isEqualAmortization();
+        if (!InterestMethod.fromInt(interestType).isFlat() && !isEqualAmortization) {
+            baseDataValidator.reset().parameter(LoanApiConstants.installmentAmountParameterName)
+                    .failWithCode("only.supported.for.flat.interest.loans");
+        }
+        if (loanProduct.isMultiDisburseLoan()) {
+            baseDataValidator.reset().parameter(LoanApiConstants.installmentAmountParameterName)
+                    .failWithCode("not.supported.with.multiple.disbursements");
+        }
+        if (loanProduct.getLoanProductRelatedDetail().isEnableDownPayment()) {
+            baseDataValidator.reset().parameter(LoanApiConstants.installmentAmountParameterName)
+                    .failWithCode("not.supported.with.down.payment");
+        }
+        if (loanProduct.isInterestRecalculationEnabled()) {
+            baseDataValidator.reset().parameter(LoanApiConstants.installmentAmountParameterName)
+                    .failWithCode("not.supported.with.interest.recalculation");
+        }
+        if (LoanScheduleType.PROGRESSIVE.equals(loanProduct.getLoanProductRelatedDetail().getLoanScheduleType())) {
+            baseDataValidator.reset().parameter(LoanApiConstants.installmentAmountParameterName)
+                    .failWithCode("not.supported.for.progressive.loans");
+        }
+        if (this.fromApiJsonHelper.parameterExists(LoanApiConstants.fixedEmiAmountParameterName, element)
+                && this.fromApiJsonHelper.extractBigDecimalWithLocaleNamed(LoanApiConstants.fixedEmiAmountParameterName, element) != null) {
+            baseDataValidator.reset().parameter(LoanApiConstants.installmentAmountParameterName)
+                    .failWithCode("not.allowed.with.fixed.emi.amount");
+        }
+        // Grace on interest is bypassed entirely by the back-solve, so it would be silently ignored rather than
+        // applied. Failing loudly is the lesser evil.
+        if (isPositive(this.fromApiJsonHelper.extractIntegerWithLocaleNamed(LoanApiConstants.graceOnInterestPaymentParameterName, element))
+                || isPositive(this.fromApiJsonHelper.extractIntegerWithLocaleNamed(LoanApiConstants.graceOnInterestChargedParameterName,
+                        element))) {
+            baseDataValidator.reset().parameter(LoanApiConstants.installmentAmountParameterName)
+                    .failWithCode("not.supported.with.interest.grace");
+        }
+    }
+
+    private boolean isPositive(final Integer value) {
+        return value != null && value > 0;
     }
 
     private BigDecimal getFirstDisbursalAmount(final Loan loan) {

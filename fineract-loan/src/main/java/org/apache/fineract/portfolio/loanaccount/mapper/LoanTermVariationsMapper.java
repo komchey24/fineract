@@ -107,11 +107,11 @@ public class LoanTermVariationsMapper {
             interestChargedFromDate = loan.getDisbursementDate();
         }
 
-        return LoanApplicationTerms.assembleFrom(scheduleGeneratorDTO.getCurrency(), loanTermFrequency, loan.getTermPeriodFrequencyType(),
-                nthDayType, dayOfWeekType, loan.getDisbursementDate(), loan.getExpectedFirstRepaymentOnDate(),
-                scheduleGeneratorDTO.getCalculatedRepaymentsStartingFromDate(), loan.getInArrearsTolerance(),
-                loan.getLoanRepaymentScheduleDetail(), loan.getLoanProduct().isMultiDisburseLoan(), loan.getFixedEmiAmount(),
-                disbursementData, loan.getMaxOutstandingLoanBalance(), interestChargedFromDate,
+        final LoanApplicationTerms loanApplicationTerms = LoanApplicationTerms.assembleFrom(scheduleGeneratorDTO.getCurrency(),
+                loanTermFrequency, loan.getTermPeriodFrequencyType(), nthDayType, dayOfWeekType, loan.getDisbursementDate(),
+                loan.getExpectedFirstRepaymentOnDate(), scheduleGeneratorDTO.getCalculatedRepaymentsStartingFromDate(),
+                loan.getInArrearsTolerance(), loan.getLoanRepaymentScheduleDetail(), loan.getLoanProduct().isMultiDisburseLoan(),
+                loan.getFixedEmiAmount(), disbursementData, loan.getMaxOutstandingLoanBalance(), interestChargedFromDate,
                 loan.getLoanProduct().getPrincipalThresholdForLastInstallment(),
                 loan.getLoanProductRelatedDetail().getInstallmentAmountInMultiplesOf(), recalculationFrequencyType, restCalendarInstance,
                 compoundingMethod, compoundingCalendarInstance, compoundingFrequencyType,
@@ -122,6 +122,11 @@ public class LoanTermVariationsMapper {
                 scheduleGeneratorDTO.isInterestToBeRecoveredFirstWhenGreaterThanEMI(), loan.getFixedPrincipalPercentagePerInstallment(),
                 scheduleGeneratorDTO.isPrincipalCompoundingDisabledForOverdueLoans(), repaymentStartDateType, loan.getSubmittedOnDate(),
                 loan.isAllowFullTermForTranche());
+        // Set post construction rather than threading another argument through the assembleFrom overloads. This is the
+        // only funnel that builds LoanApplicationTerms from a persisted loan, so every schedule regeneration - submit,
+        // approve, disburse, undo, preview - picks the adjustment up from here.
+        loanApplicationTerms.setAdjustedInstallmentAmount(loan.getAdjustedInstallmentAmount());
+        return loanApplicationTerms;
     }
 
     private BigDecimal constructFloatingInterestRates(final BigDecimal annualNominalInterestRate, final FloatingRateDTO floatingRateDTO,

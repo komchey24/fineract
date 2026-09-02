@@ -195,6 +195,10 @@ public class FeignLoanHelper {
         return ok(() -> fineractClient.loans().handleCommandsLoan(loanId, request, Map.of("command", "approve")));
     }
 
+    public PostLoansLoanIdResponse adjustInstallmentAmount(Long loanId, PostLoansLoanIdRequest request) {
+        return ok(() -> fineractClient.loans().handleCommandsLoan(loanId, request, Map.of("command", "adjustInstallmentAmount")));
+    }
+
     // TODO: Rewrite to use fineract-client instead!
     public void approveLoanFromJson(Long loanId, String approveLoanJson) {
         ResponseSpecification responseSpec = new ResponseSpecBuilder().expectStatusCode(200).build();
@@ -580,6 +584,10 @@ public class FeignLoanHelper {
 
     public PostLoansLoanIdResponse disburseLoan(String loanExternalId, PostLoansLoanIdRequest request) {
         return ok(() -> fineractClient.loans().handleCommandsLoanByExternalId(loanExternalId, request, "disburse"));
+    }
+
+    public PostLoansLoanIdResponse undoApprovalLoan(Long loanId, PostLoansLoanIdRequest request) {
+        return ok(() -> fineractClient.loans().handleCommandsLoan(loanId, request, Map.of("command", "undoapproval")));
     }
 
     public PostLoansLoanIdResponse undoApprovalLoan(String loanExternalId, PostLoansLoanIdRequest request) {

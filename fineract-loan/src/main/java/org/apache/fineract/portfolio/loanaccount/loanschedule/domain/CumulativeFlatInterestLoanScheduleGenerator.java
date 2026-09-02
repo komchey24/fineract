@@ -63,6 +63,30 @@ public class CumulativeFlatInterestLoanScheduleGenerator extends AbstractCumulat
             @SuppressWarnings("unused") Map<LocalDate, Money> compoundingMap, LocalDate periodStartDate, LocalDate periodEndDate,
             @SuppressWarnings("unused") Collection<LoanTermVariationsData> termVariations) {
 
+        if (loanApplicationTerms.isInstallmentAmountAdjusted()) {
+            // Manual installment amount adjustment. The ordering here is deliberately inverted compared to the
+            // standard path below: normally interest is computed first and principal is derived from it, but here
+            // principal is authoritative and interest is back-solved from the officer supplied installment total.
+            // Principal therefore has to be fully settled - including the last period rounding correction - before
+            // interest is derived, otherwise the final installment would not land exactly on the requested amount.
+            //
+            // Interest is passed as null to calculateTotalPrincipalForPeriod on purpose. Its only two consumers for
+            // FLAT loans are the installmentAmountInMultiplesOf block, which guards on null and then simply rounds
+            // principal (exactly what we want), and the fixed EMI branch, which is unreachable because a fixed EMI
+            // amount is rejected up front by the validator.
+            Money adjustedPrincipal = loanApplicationTerms.calculateTotalPrincipalForPeriod(calculator, outstandingBalance, periodNumber,
+                    mc, null);
+            adjustedPrincipal = loanApplicationTerms.adjustPrincipalIfLastRepaymentPeriod(adjustedPrincipal,
+                    totalCumulativePrincipal.plus(adjustedPrincipal), periodNumber);
+
+            // adjustInterestIfLastRepaymentPeriod is intentionally skipped: the loan level total interest has already
+            // been overridden to (installmentAmount * numberOfRepayments - principal), so the cumulative interest
+            // lands on it exactly and the correction could only be a no-op or a source of drift.
+            final Money adjustedInterest = loanApplicationTerms.calculateAdjustedInterestForPeriod(adjustedPrincipal);
+
+            return new PrincipalInterest(adjustedPrincipal, adjustedInterest, cumulatingInterestPaymentDueToGrace);
+        }
+
         final PrincipalInterest result = loanApplicationTerms.calculateTotalInterestForPeriod(calculator,
                 interestCalculationGraceOnRepaymentPeriodFraction, periodNumber, mc, cumulatingInterestPaymentDueToGrace,
                 outstandingBalance, periodStartDate, periodEndDate);
