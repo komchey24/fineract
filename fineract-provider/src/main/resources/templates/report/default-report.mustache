@@ -1,0 +1,67 @@
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>{{reportName}}</title>
+<style>
+  /* preferCssPageSize=true is sent to the renderer, so this rule decides paper size and orientation.
+     Margins come from the render request instead, because Chromium ignores @page margins when printing. */
+  @page { size: A4 landscape; }
+
+  /* Khmer needs a font with the script's OpenType shaping tables; the renderer image must provide one.
+     The Latin fallbacks only apply to reports that contain no Khmer at all. */
+  body {
+    font-family: "Noto Sans Khmer", "Khmer OS Battambang", "Khmer OS", "Noto Sans", "DejaVu Sans", sans-serif;
+    font-size: 8pt;
+    color: #111;
+    margin: 0;
+  }
+
+  header { margin-bottom: 8px; }
+  h1 { font-size: 13pt; font-weight: 600; margin: 0 0 4px 0; }
+  .meta { font-size: 7.5pt; color: #555; }
+  .meta span + span::before { content: " · "; }
+
+  table { width: 100%; border-collapse: collapse; }
+  /* repeats the column headings at the top of every page */
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
+  th, td {
+    border: 0.5pt solid #bbb;
+    padding: 3px 4px;
+    text-align: left;
+    vertical-align: top;
+    word-break: break-word;
+  }
+  th { background: #eceff1; font-weight: 600; }
+  tbody tr.odd td { background: #f7f8f9; }
+  th.num, td.num { text-align: right; white-space: nowrap; }
+  .empty { padding: 16px; text-align: center; color: #777; font-style: italic; }
+</style>
+</head>
+<body>
+<header>
+  <h1>{{reportName}}</h1>
+  <div class="meta">
+    {{#params}}<span>{{name}}: {{value}}</span>{{/params}}
+    <span>{{rowCount}} rows</span>
+    <span>generated {{generatedAt}}</span>
+  </div>
+</header>
+
+{{#hasRows}}
+<table>
+  <thead>
+    <tr>{{#columns}}<th class="{{#numeric}}num{{/numeric}}">{{name}}</th>{{/columns}}</tr>
+  </thead>
+  <tbody>
+    {{#rows}}
+    <tr class="{{#odd}}odd{{/odd}}">{{#cells}}<td class="{{#numeric}}num{{/numeric}}">{{value}}</td>{{/cells}}</tr>
+    {{/rows}}
+  </tbody>
+</table>
+{{/hasRows}}
+{{^hasRows}}
+<div class="empty">No data</div>
+{{/hasRows}}
+</body>
+</html>

@@ -404,6 +404,17 @@ public class FineractProperties {
     public static class FineractReportProperties {
 
         private FineractExportProperties export;
+        private FineractReportPdfProperties pdf;
+    }
+
+    @Getter
+    @Setter
+    public static class FineractReportPdfProperties {
+
+        private boolean enabled;
+        private String url;
+        private int connectTimeoutSeconds;
+        private int readTimeoutSeconds;
     }
 
     @Getter
