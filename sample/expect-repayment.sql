@@ -1,11 +1,12 @@
 -- =====================================================================================
 -- Collection / expected-repayment report  —  តារាងប្រមូលប្រាក់
 --
--- 19 columns, Khmer headers, matching sample/expect-repayment.pdf.
+-- 19 printed columns, Khmer headers, matching sample/expect-repayment.pdf, plus a 20th
+-- column carrying the loan officer for the PDF header only (see below).
 -- Only the SELECT list changed; the sched/inst CTEs, joins, WHERE and ORDER BY are
 -- identical to the previous version.
 --
--- Dropped vs. previous version: "Status", "Office", "Loan Officer".
+-- Dropped vs. previous version: "Status", "Office".
 -- (Late/not-late and loan-officer ordering are still applied — just not displayed.)
 --
 -- Parameters (already registered in stretchy_report_parameter — nothing new to add):
@@ -101,7 +102,10 @@ SELECT
     -- 18 Interest due (as of endDate)
     sched.interest_due                                AS "ការប្រាក់",
     -- 19 Total due (as of endDate)
-    sched.principal_due + sched.interest_due          AS "សរុប"
+    sched.principal_due + sched.interest_due          AS "សរុប",
+    -- 20 Loan officer — header only. The PDF layout in sample/expect-repayment-template.sql lifts this column
+    --    into the sheet header and removes it from the table, so it costs no width on the printed page.
+    COALESCE(ms.display_name,'-')                     AS "មន្ត្រីឥណទាន"
 FROM m_office mo
 JOIN m_office ounder
      ON ounder.hierarchy LIKE CONCAT(mo.hierarchy, '%')

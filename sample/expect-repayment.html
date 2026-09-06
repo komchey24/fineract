@@ -1,0 +1,268 @@
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements. See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership. The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License. You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied. See the License for the
+  specific language governing permissions and limitations
+  under the License.
+-->
+<!doctype html>
+<!--
+  Static preview of the "expect-repayment" report as rendered by the templated PDF export.
+
+  This file is a SAMPLE ONLY: the rows below are the data from sample/expect-repayment.pdf, pasted in the raw
+  shape the resultset delivers them (unformatted decimals, ISO dates) so the formatting script is exercised the
+  same way it is in production. Open it in a browser to eyeball the layout, or print it to compare against
+  sample/expect-repayment.pdf.
+
+  The deployable version of this markup lives in sample/expect-repayment-template.sql — keep the two in sync.
+-->
+<html lang="km">
+<head>
+<meta charset="utf-8"/>
+<title>តារាងប្រមូលប្រាក់</title>
+<style>
+  /* preferCssPageSize=true is sent to Gotenberg, so this rule decides paper size and orientation.
+     Margins come from the render request (0.35/0.45/0.25/0.25in), because Chromium ignores @page margins. */
+  @page { size: A4 landscape; }
+
+  /* Khmer needs a font carrying the script's OpenType shaping tables; the renderer image provides these two. */
+  body {
+    font-family: "Noto Sans Khmer", "Khmer OS Battambang", "Khmer OS", "Noto Sans", "DejaVu Sans", sans-serif;
+    font-size: 7pt;
+    color: #000;
+    margin: 0;
+  }
+
+  /* ------------------------------------------------------------------ header */
+  header { margin-bottom: 6px; }
+  h1 {
+    font-family: "Khmer OS Muol Light", "Khmer OS Muol", "Noto Serif Khmer", "Noto Sans Khmer", serif;
+    font-size: 12pt;
+    font-weight: 600;
+    text-align: center;
+    margin: 0 0 5px 0;
+  }
+  /* Loan officer on the left, the reporting period in the middle, the outstanding total on the right —
+     the three facts the printed sheet is read by. */
+  .head-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 9pt;
+    padding-bottom: 4px;
+  }
+  .head-line .period { flex: 1 1 auto; text-align: center; }
+  .head-line .officer, .head-line .outstanding { flex: 0 0 auto; white-space: nowrap; }
+  .head-line .label { color: #333; }
+  .head-line .value { font-weight: 600; }
+
+  /* ------------------------------------------------------------------- table */
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  thead { display: table-header-group; }   /* repeat the headings on every page */
+  tr { break-inside: avoid; }
+  th, td {
+    border: 0.5pt solid #666;
+    padding: 2px 3px;
+    text-align: left;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+  }
+  th { background: #e8eaed; font-weight: 600; font-size: 6.5pt; text-align: center; vertical-align: middle; }
+  th.num, td.num { text-align: right; white-space: nowrap; }
+  th.num { white-space: normal; text-align: center; }   /* only the figures stay on one line */
+  td:nth-child(2) { white-space: nowrap; }   /* កាលបរិច្ឆេទ never wraps mid-date */
+  /* Figures and dates carry no Khmer, and the Khmer faces set Latin digits far wider than the columns
+     allow — the printed sheet gets its width budget from a condensed Latin face, as the original did
+     with Arial Narrow. Every name here except Arial Narrow is present in the renderer image. */
+  td.num, th.num, td:nth-child(2) {
+    font-family: "DejaVu Sans Condensed", "Liberation Sans Narrow", "Arial Narrow", "Liberation Sans",
+                 "DejaVu Sans", sans-serif;
+  }
+  .empty { padding: 16px; text-align: center; color: #777; font-style: italic; }
+
+  /* Column widths, in source order, taken from the vertical rules of sample/expect-repayment.pdf and
+     rescaled over 19 columns — the PDF carries a 20th, blank, write-in column this report has no data for. */
+  col.c1             { width:  2.63%; }   /* ល.រ */
+  col.c2             { width:  5.85%; }   /* កាលបរិច្ឆេទ */
+  col.c3             { width:  4.81%; }   /* កិច្ចសន្យា */
+  col.c4             { width:  4.61%; }   /* កូដ */
+  col.c5             { width:  7.22%; }   /* ឈ្មោះអតិថិជន */
+  col.c6             { width: 10.49%; }   /* ទំនាក់ទំនង */
+  col.c7             { width:  9.19%; }   /* អាសយដ្ឋាន */
+  col.c8             { width:  5.11%; }   /* ទឹកប្រាក់ខ្ចី */
+  col.c9             { width:  3.69%; }   /* រយៈពេល */
+  col.c10            { width:  5.12%; }   /* ទឹកប្រាក់ត្រូវបង់ */
+  col.c11            { width:  5.93%; }   /* ប្រភេទកម្ចី */
+  col.c12            { width:  2.70%; }   /* យឺត */
+  col.c13            { width:  3.90%; }   /* បង់រួច */
+  col.c14            { width:  4.90%; }   /* នៅសល់ */
+  col.c15            { width:  5.01%; }   /* សរុបដើម */
+  col.c16            { width:  4.92%; }   /* ប្រាក់ដើម */
+  col.c17            { width:  4.61%; }   /* សរុបការ */
+  col.c18            { width:  4.62%; }   /* ការប្រាក់ */
+  col.c19            { width:  4.70%; }   /* សរុប */
+
+  /* Screen-only: show the sheet at its printed width so the preview matches the PDF. */
+  @media screen {
+    body { background: #eceff1; padding: 24px 0; }
+    .sheet {
+      width: 11.19in;                  /* A4 landscape 11.69in less the 0.25in side margins */
+      margin: 0 auto;
+      padding: 0.35in 0.25in 0.45in;
+      background: #fff;
+      box-sizing: content-box;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.25);
+    }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+<header>
+  <h1>តារាងប្រមូលប្រាក់</h1>
+  <div class="head-line">
+    <span class="officer"><span class="label">មន្ត្រីឥណទាន៖</span> <span class="value" id="officer">មន ណារាជ</span></span>
+    <span class="period">ចាប់ពីថ្ងៃទី <span class="value" id="start-date">2026-08-06</span>
+      ដល់ថ្ងៃទី <span class="value" id="end-date">2026-08-13</span></span>
+    <span class="outstanding"><span class="label">ទឹកប្រាក់នៅសល់សរុប៖</span> <span class="value" id="outstanding">—</span></span>
+  </div>
+</header>
+
+<table id="report">
+  <colgroup>
+    <col class="c1"/><col class="c2"/><col class="c3"/><col class="c4"/><col class="c5"/><col class="c6"/>
+    <col class="c7"/><col class="c8"/><col class="c9"/><col class="c10"/><col class="c11"/><col class="c12"/>
+    <col class="c13"/><col class="c14"/><col class="c15"/><col class="c16"/><col class="c17"/><col class="c18"/>
+    <col class="c19"/>
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="num">ល.រ</th>
+      <th>កាលបរិច្ឆេទ</th>
+      <th>កិច្ចសន្យា</th>
+      <th>កូដ</th>
+      <th>ឈ្មោះអតិថិជន</th>
+      <th>ទំនាក់ទំនង</th>
+      <th>អាសយដ្ឋាន</th>
+      <th class="num">ទឹកប្រាក់ខ្ចី</th>
+      <th class="num">រយៈពេល</th>
+      <th class="num">ទឹកប្រាក់ត្រូវបង់</th>
+      <th>ប្រភេទកម្ចី</th>
+      <th class="num">យឺត</th>
+      <th class="num">បង់រួច</th>
+      <th class="num">នៅសល់</th>
+      <th class="num">សរុបដើម</th>
+      <th class="num">ប្រាក់ដើម</th>
+      <th class="num">សរុបការ</th>
+      <th class="num">ការប្រាក់</th>
+      <th class="num">សរុប</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="num">1</td><td>2026-06-26</td><td>9458</td><td>1376</td><td>សាត ស្រីលីន</td><td>092 77 3181</td><td>ក្រសាំងពុល, ស្វាយ</td><td class="num">1000000.000000</td><td class="num">8</td><td class="num">140000.000000</td><td>សប្តាហ៍</td><td class="num">0</td><td class="num">5</td><td class="num">3</td><td class="num">375000.000000</td><td class="num">250000.000000</td><td class="num">45000.000000</td><td class="num">30000.000000</td><td class="num">280000.000000</td></tr>
+    <tr><td class="num">2</td><td>2026-07-10</td><td>9608</td><td>1392</td><td>សៀក ទេវី</td><td>097 86 70 580</td><td>ត្រពាំងម្ទេស, ស្វាយជុក</td><td class="num">1000000.000000</td><td class="num">8</td><td class="num">140000.000000</td><td>សប្តាហ៍</td><td class="num">0</td><td class="num">3</td><td class="num">5</td><td class="num">625000.000000</td><td class="num">250000.000000</td><td class="num">75000.000000</td><td class="num">30000.000000</td><td class="num">280000.000000</td></tr>
+    <tr><td class="num">3</td><td>2026-07-20</td><td>9710</td><td>1404</td><td>សុខ ផ្លា</td><td>061 92 94 54</td><td>ត្រពាំងម្ទេស, ស្វាយជុក</td><td class="num">1000000.000000</td><td class="num">8</td><td class="num">140000.000000</td><td>សប្តាហ៍</td><td class="num">0</td><td class="num">2</td><td class="num">6</td><td class="num">750000.000000</td><td class="num">125000.000000</td><td class="num">90000.000000</td><td class="num">15000.000000</td><td class="num">140000.000000</td></tr>
+    <tr><td class="num">4</td><td>2026-07-27</td><td>9782</td><td>1326</td><td>សឿន សំបូរ</td><td>0973745049</td><td>ត្រពាំងម្ទេស, ស្វាយជុក</td><td class="num">1000000.000000</td><td class="num">8</td><td class="num">140000.000000</td><td>សប្តាហ៍</td><td class="num">0</td><td class="num">1</td><td class="num">7</td><td class="num">875000.000000</td><td class="num">125000.000000</td><td class="num">105000.000000</td><td class="num">15000.000000</td><td class="num">140000.000000</td></tr>
+    <tr><td class="num">5</td><td>2026-07-27</td><td>9784</td><td>1411</td><td>វ៉ែន ឆេងហ៊ុន</td><td>096 428 7800</td><td>ស្រះកែវ, វាំងចាស់</td><td class="num">2000000.000000</td><td class="num">10</td><td class="num">230000.000000</td><td>សប្តាហ៍</td><td class="num">0</td><td class="num">1</td><td class="num">9</td><td class="num">1800000.000000</td><td class="num">200000.000000</td><td class="num">270000.000000</td><td class="num">30000.000000</td><td class="num">230000.000000</td></tr>
+    <tr><td class="num">6</td><td>2026-07-21</td><td>9717</td><td>1363</td><td>សែម ពៅ</td><td>0979308513</td><td>ពោធិ៍រិទ្ធត្រៃ, ស្វាយ</td><td class="num">1000000.000000</td><td class="num">8</td><td class="num">140000.000000</td><td>សប្តាហ៍</td><td class="num">0</td><td class="num">2</td><td class="num">6</td><td class="num">750000.000000</td><td class="num">125000.000000</td><td class="num">90000.000000</td><td class="num">15000.000000</td><td class="num">140000.000000</td></tr>
+    <tr><td class="num">7</td><td>2026-07-15</td><td>9664</td><td>1396</td><td>នី ស្រីពៅ</td><td>096 8666375</td><td>ត្រពាំងម្ទេស, ស្វាយជុក</td><td class="num">1000000.000000</td><td class="num">12</td><td class="num">98500.000000</td><td>សប្តាហ៍</td><td class="num">0</td><td class="num">3</td><td class="num">9</td><td class="num">749800.000000</td><td class="num">83400.000000</td><td class="num">135900.000000</td><td class="num">15100.000000</td><td class="num">98500.000000</td></tr>
+    <tr><td class="num">8</td><td>2026-08-05</td><td>9871</td><td>1371</td><td>ឈុំ សេរីសោភ័ណ្ឌ</td><td>081 78 96 86</td><td>ក្រសាំងពុល, ស្វាយ</td><td class="num">1000000.000000</td><td class="num">8</td><td class="num">140000.000000</td><td>សប្តាហ៍</td><td class="num">0</td><td class="num">0</td><td class="num">8</td><td class="num">1000000.000000</td><td class="num">125000.000000</td><td class="num">120000.000000</td><td class="num">15000.000000</td><td class="num">140000.000000</td></tr>
+    <tr><td class="num">9</td><td>2026-06-08</td><td>9243</td><td>1351</td><td>សឿន សុជាតិ</td><td>081 24 55 54</td><td>ក្រសាំងពុល, ស្វាយ</td><td class="num">1000000.000000</td><td class="num">8</td><td class="num">140000.000000</td><td>សប្តាហ៍</td><td class="num">31</td><td class="num">3</td><td class="num">5</td><td class="num">580000.000000</td><td class="num">580000.000000</td><td class="num">60000.000000</td><td class="num">60000.000000</td><td class="num">640000.000000</td></tr>
+    <tr><td class="num">10</td><td>2026-07-02</td><td>9539</td><td>1384</td><td>ស្រង ណៈ</td><td>096 634 67 60</td><td>ស្វាយផ្អែម, ស្វាយជុក</td><td class="num">500000.000000</td><td class="num">25</td><td class="num">22000.000000</td><td>ថ្ងៃ</td><td class="num">24</td><td class="num">7</td><td class="num">18</td><td class="num">345000.000000</td><td class="num">345000.000000</td><td class="num">34000.000000</td><td class="num">34000.000000</td><td class="num">379000.000000</td></tr>
+    <tr><td class="num">11</td><td>2026-07-10</td><td>9610</td><td>1394</td><td>ឌី សុផា</td><td>-</td><td>ភ្នំ, ផ្សារដែក</td><td class="num">500000.000000</td><td class="num">6</td><td class="num">93500.000000</td><td>សប្តាហ៍</td><td class="num">14</td><td class="num">1</td><td class="num">5</td><td class="num">416600.000000</td><td class="num">333600.000000</td><td class="num">49500.000000</td><td class="num">39400.000000</td><td class="num">373000.000000</td></tr>
+    <tr><td class="num">12</td><td>2026-06-11</td><td>9284</td><td>1358</td><td>ខុន ឃឹម</td><td>097 64 09 405</td><td>ក្រាំងស្រម៉, ស្វាយជុក</td><td class="num">500000.000000</td><td class="num">10</td><td class="num">54300.000000</td><td>សប្តាហ៍</td><td class="num">10</td><td class="num">6</td><td class="num">4</td><td class="num">200000.000000</td><td class="num">150000.000000</td><td class="num">29800.000000</td><td class="num">22300.000000</td><td class="num">172300.000000</td></tr>
+    <tr><td class="num">13</td><td>2026-06-22</td><td>9402</td><td>533</td><td>ថាច់ ចន្ទ្រា</td><td>086 567 966</td><td>ចិនដាំម្លូ, វាំងចាស់</td><td class="num">2500000.000000</td><td class="num">10</td><td class="num">287500.000000</td><td>សប្តាហ៍</td><td class="num">10</td><td class="num">4</td><td class="num">6</td><td class="num">1500000.000000</td><td class="num">750000.000000</td><td class="num">225000.000000</td><td class="num">112500.000000</td><td class="num">862500.000000</td></tr>
+    <tr><td class="num">14</td><td>2026-06-16</td><td>9342</td><td>103</td><td>កែវ ចាន់ថា</td><td>086485558</td><td>ចំការហ្លួង, វាំងចាស់</td><td class="num">4000000.000000</td><td class="num">50</td><td class="num">90000.000000</td><td>ថ្ងៃ</td><td class="num">8</td><td class="num">30</td><td class="num">20</td><td class="num">1600000.000000</td><td class="num">960000.000000</td><td class="num">200000.000000</td><td class="num">120000.000000</td><td class="num">1080000.000000</td></tr>
+    <tr><td class="num">15</td><td>2026-07-02</td><td>9538</td><td>1330</td><td>សូត្រ សុធា</td><td>081 604 762</td><td>ត្រពាំងម្ទេស, ស្វាយជុក</td><td class="num">1500000.000000</td><td class="num">8</td><td class="num">210000.000000</td><td>សប្តាហ៍</td><td class="num">7</td><td class="num">3</td><td class="num">5</td><td class="num">937500.000000</td><td class="num">562500.000000</td><td class="num">112500.000000</td><td class="num">67500.000000</td><td class="num">630000.000000</td></tr>
+    <tr><td class="num">16</td><td>2026-07-10</td><td>9609</td><td>1393</td><td>ឌី សុខា</td><td>01067 03 62</td><td>ភ្នំ, ផ្សារដែក</td><td class="num">500000.000000</td><td class="num">6</td><td class="num">93500.000000</td><td>សប្តាហ៍</td><td class="num">7</td><td class="num">2</td><td class="num">4</td><td class="num">333200.000000</td><td class="num">250200.000000</td><td class="num">40400.000000</td><td class="num">30300.000000</td><td class="num">280500.000000</td></tr>
+    <tr><td class="num">17</td><td>2026-07-17</td><td>9699</td><td>1400</td><td>ជឿន ចាន់ធូ</td><td>015 951 959</td><td>ក្រាំងស្រម៉, ស្វាយជុក</td><td class="num">1000000.000000</td><td class="num">8</td><td class="num">140000.000000</td><td>សប្តាហ៍</td><td class="num">7</td><td class="num">1</td><td class="num">7</td><td class="num">820000.000000</td><td class="num">320000.000000</td><td class="num">90000.000000</td><td class="num">30000.000000</td><td class="num">350000.000000</td></tr>
+    <tr><td class="num">18</td><td>2026-07-13</td><td>9635</td><td>103</td><td>កែវ ចាន់ថា</td><td>086485558</td><td>ចំការហ្លួង, វាំងចាស់</td><td class="num">5000000.000000</td><td class="num">50</td><td class="num">113000.000000</td><td>ថ្ងៃ</td><td class="num">3</td><td class="num">14</td><td class="num">36</td><td class="num">3600000.000000</td><td class="num">900000.000000</td><td class="num">468000.000000</td><td class="num">117000.000000</td><td class="num">1017000.000000</td></tr>
+    <tr><td class="num">19</td><td>2026-07-17</td><td>9698</td><td>1359</td><td>អោ ចន្នី</td><td>-</td><td>នាងមាលា, ត្បែងខ្ពស់</td><td class="num">1000000.000000</td><td class="num">30</td><td class="num">36500.000000</td><td>ថ្ងៃ</td><td class="num">3</td><td class="num">11</td><td class="num">19</td><td class="num">632600.000000</td><td class="num">300600.000000</td><td class="num">60900.000000</td><td class="num">27900.000000</td><td class="num">328500.000000</td></tr>
+    <tr><td class="num">20</td><td>2026-07-27</td><td>9783</td><td>429</td><td>ណម ស្រីម៉ៅ</td><td>070 920 543</td><td>ក្រាំងពៃន្ល, វាំងចាស់</td><td class="num">3500000.000000</td><td class="num">50</td><td class="num">84000.000000</td><td>ថ្ងៃ</td><td class="num">3</td><td class="num">5</td><td class="num">45</td><td class="num">3150000.000000</td><td class="num">630000.000000</td><td class="num">630000.000000</td><td class="num">126000.000000</td><td class="num">756000.000000</td></tr>
+    <tr><td class="num">21</td><td>2026-07-30</td><td>9823</td><td>1414</td><td>សៀក រ៉ាង</td><td>061 79 06 85</td><td>ត្រពាំងម្ទេស, ស្វាយជុក</td><td class="num">1000000.000000</td><td class="num">40</td><td class="num">28000.000000</td><td>ថ្ងៃ</td><td class="num">3</td><td class="num">2</td><td class="num">38</td><td class="num">950000.000000</td><td class="num">225000.000000</td><td class="num">114000.000000</td><td class="num">27000.000000</td><td class="num">252000.000000</td></tr>
+    <tr><td class="num">22</td><td>2026-07-28</td><td>9792</td><td>1350</td><td>មឿន ម៉ុន</td><td>-</td><td>ក្រសាំងពុល, ស្វាយ</td><td class="num">1000000.000000</td><td class="num">8</td><td class="num">140000.000000</td><td>សប្តាហ៍</td><td class="num">2</td><td class="num">0</td><td class="num">8</td><td class="num">1000000.000000</td><td class="num">250000.000000</td><td class="num">120000.000000</td><td class="num">30000.000000</td><td class="num">280000.000000</td></tr>
+    <tr><td class="num">23</td><td>2026-07-15</td><td>9666</td><td>1369</td><td>ជា ចន្ថា</td><td>-</td><td>ក្រសាំងពុល, ស្វាយ</td><td class="num">700000.000000</td><td class="num">7</td><td class="num">110500.000000</td><td>សប្តាហ៍</td><td class="num">1</td><td class="num">2</td><td class="num">5</td><td class="num">500000.000000</td><td class="num">200000.000000</td><td class="num">52000.000000</td><td class="num">20500.000000</td><td class="num">220500.000000</td></tr>
+    <tr><td class="num">24</td><td>2026-07-22</td><td>9725</td><td>1367</td><td>ណន គ្រុយ</td><td>081 53 15 49</td><td>ក្រសាំងពុល, ស្វាយ</td><td class="num">700000.000000</td><td class="num">7</td><td class="num">110500.000000</td><td>សប្តាហ៍</td><td class="num">1</td><td class="num">1</td><td class="num">6</td><td class="num">600000.000000</td><td class="num">200000.000000</td><td class="num">63000.000000</td><td class="num">21000.000000</td><td class="num">221000.000000</td></tr>
+    <tr><td class="num">25</td><td>2026-07-31</td><td>9845</td><td>1416</td><td>វ៉ាន រ៉ុម</td><td>096 80 35 509</td><td>ក្រសាំងពុល, ស្វាយ</td><td class="num">1000000.000000</td><td class="num">30</td><td class="num">36500.000000</td><td>ថ្ងៃ</td><td class="num">1</td><td class="num">3</td><td class="num">27</td><td class="num">899800.000000</td><td class="num">233800.000000</td><td class="num">85700.000000</td><td class="num">21700.000000</td><td class="num">255500.000000</td></tr>
+  </tbody>
+</table>
+
+</div>
+
+<script>
+/*
+ * The report resultset reaches the template as one flat table of strings: no aggregates, no loan officer name
+ * resolved from the id, and figures still carrying the scale Postgres returns them at. This script is what turns
+ * that into the printed sheet, and Gotenberg's Chromium runs it before it takes the page snapshot.
+ *
+ *  1. formats every numeric cell with thousand separators and no decimals,
+ *  2. rewrites ISO dates as dd/MM/yyyy,
+ *  3. totals the two outstanding columns — principal (សរុបដើម) plus interest (សរុបការ) — into the header.
+ */
+(function () {
+  'use strict';
+
+  var PRINCIPAL_OUTSTANDING = 'សរុបដើម';
+  var INTEREST_OUTSTANDING = 'សរុបការ';
+
+  var table = document.getElementById('report');
+  if (!table || !table.tHead) { return; }
+
+  var headings = Array.prototype.map.call(table.tHead.rows[0].cells, function (cell) {
+    return cell.textContent.trim();
+  });
+  var outstandingColumns = [PRINCIPAL_OUTSTANDING, INTEREST_OUTSTANDING]
+    .map(function (name) { return headings.indexOf(name); })
+    .filter(function (index) { return index >= 0; });
+
+  var amount = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+  var ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+  var total = 0;
+
+  Array.prototype.forEach.call(table.tBodies[0].rows, function (row) {
+    Array.prototype.forEach.call(row.cells, function (cell, column) {
+      var text = cell.textContent.trim();
+
+      var isoDate = ISO_DATE.exec(text);
+      if (isoDate) {
+        cell.textContent = isoDate[3] + '/' + isoDate[2] + '/' + isoDate[1];
+        return;
+      }
+
+      if (!cell.classList.contains('num') || text === '') { return; }
+      var value = Number(text);
+      if (!isFinite(value)) { return; }
+
+      cell.textContent = amount.format(value);
+      if (outstandingColumns.indexOf(column) >= 0) { total += value; }
+    });
+  });
+
+  // Only claim a total when both outstanding columns were actually found.
+  if (outstandingColumns.length === 2) {
+    document.getElementById('outstanding').textContent = amount.format(total);
+  }
+
+  ['start-date', 'end-date'].forEach(function (id) {
+    var element = document.getElementById(id);
+    if (!element) { return; }
+    var isoDate = ISO_DATE.exec(element.textContent.trim());
+    if (isoDate) { element.textContent = isoDate[3] + '/' + isoDate[2] + '/' + isoDate[1]; }
+  });
+}());
+</script>
+</body>
+</html>
