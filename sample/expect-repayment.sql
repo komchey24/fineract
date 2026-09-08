@@ -72,7 +72,7 @@ SELECT
     -- 6  Mobile
     COALESCE(mc.mobile_no,'-')                        AS "ទំនាក់ទំនង",
     -- 7  Address
-    COALESCE((SELECT a.town_village
+    COALESCE((SELECT a.address_line_1||','||a.address_line_2||','||a.address_line_3
               FROM m_client_address ca
               JOIN m_address a ON a.id = ca.address_id
               WHERE ca.client_id = mc.id AND ca.is_active = true
@@ -103,7 +103,9 @@ SELECT
     sched.interest_due                                AS "ការប្រាក់",
     -- 19 Total due (as of endDate)
     sched.principal_due + sched.interest_due          AS "សរុប",
-    -- 20 Loan officer — header only. The PDF layout in sample/expect-repayment-template.sql lifts this column
+    -- 20 Note — deliberately empty: the printed sheet carries a blank write-in column, as the original did.
+    ''::text                                          AS "ចំណាំ",
+    -- 21 Loan officer — header only. The PDF layout in sample/expect-repayment-template.sql lifts this column
     --    into the sheet header and removes it from the table, so it costs no width on the printed page.
     COALESCE(ms.display_name,'-')                     AS "មន្ត្រីឥណទាន"
 FROM m_office mo

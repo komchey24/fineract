@@ -58,7 +58,7 @@ INSERT INTO m_template (name, entity, type, text) VALUES ('Expected Repayment', 
   /* Khmer needs a font carrying the script's OpenType shaping tables; the renderer image provides these two. */
   body {
     font-family: "Noto Sans Khmer", "Khmer OS Battambang", "Khmer OS", "Noto Sans", "DejaVu Sans", sans-serif;
-    font-size: 7pt;
+    font-size: 9pt;
     color: #000;
     margin: 0;
   }
@@ -112,19 +112,19 @@ INSERT INTO m_template (name, entity, type, text) VALUES ('Expected Repayment', 
   .empty { padding: 16px; text-align: center; color: #777; font-style: italic; }
 
   /* Column widths, in the order the report SELECT lists them, taken from the vertical rules of
-     sample/expect-repayment.pdf and rescaled over 19 columns — the PDF carries a 20th, blank, write-in
-     column this report has no data for. The loan officer column is left unsized: the script removes it. */
+     sample/expect-repayment.pdf — 20 columns, the last of which (ចំណាំ) is the blank write-in column the
+     report emits empty. The loan officer column is left unsized: the script removes it. */
   col:nth-child(1)   { width:  2.63%; }   /* ល.រ */
   col:nth-child(2)   { width:  5.85%; }   /* កាលបរិច្ឆេទ */
   col:nth-child(3)   { width:  4.81%; }   /* កិច្ចសន្យា */
   col:nth-child(4)   { width:  4.61%; }   /* កូដ */
   col:nth-child(5)   { width:  7.22%; }   /* ឈ្មោះអតិថិជន */
-  col:nth-child(6)   { width: 10.49%; }   /* ទំនាក់ទំនង */
+  col:nth-child(6)   { width:  6.49%; }   /* ទំនាក់ទំនង -4 */
   col:nth-child(7)   { width:  9.19%; }   /* អាសយដ្ឋាន */
   col:nth-child(8)   { width:  5.11%; }   /* ទឹកប្រាក់ខ្ចី */
   col:nth-child(9)   { width:  3.69%; }   /* រយៈពេល */
   col:nth-child(10)  { width:  5.12%; }   /* ទឹកប្រាក់ត្រូវបង់ */
-  col:nth-child(11)  { width:  5.93%; }   /* ប្រភេទកម្ចី */
+  col:nth-child(11)  { width:  3.93%; }   /* ប្រភេទកម្ចី -2 */
   col:nth-child(12)  { width:  2.70%; }   /* យឺត */
   col:nth-child(13)  { width:  3.90%; }   /* បង់រួច */
   col:nth-child(14)  { width:  4.90%; }   /* នៅសល់ */
@@ -133,6 +133,7 @@ INSERT INTO m_template (name, entity, type, text) VALUES ('Expected Repayment', 
   col:nth-child(17)  { width:  4.61%; }   /* សរុបការ */
   col:nth-child(18)  { width:  4.62%; }   /* ការប្រាក់ */
   col:nth-child(19)  { width:  4.70%; }   /* សរុប */
+  col:nth-child(20)  { width:  6.00%; }   /* ចំណាំ */
 </style>
 </head>
 <body>

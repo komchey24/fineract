@@ -21,7 +21,8 @@
 -- One-shot production deploy for the expect-repayment PDF header.
 --
 -- Applies BOTH database halves of the change:
---   1. the report SQL, gaining a 20th column that carries the loan officer, and
+--   1. the report SQL, gaining a blank write-in column (ចំណាំ) and a 21st column that carries
+--      the loan officer, and
 --   2. the per-report PDF layout that puts the date, the loan officer and the total
 --      outstanding (principal + interest) in the sheet header.
 --
@@ -44,7 +45,7 @@
 
 DO $deploy$
 DECLARE
-    v_report_name text := 'Expected Repayment';   -- <<< SET THIS
+    v_report_name text := 'Expected Payments By Date - Basic';   -- <<< SET THIS
 
     v_report_sql text := $rpt$WITH sched AS (
     SELECT r.loan_id,
@@ -103,7 +104,7 @@ SELECT
     -- 6  Mobile
     COALESCE(mc.mobile_no,'-')                        AS "ទំនាក់ទំនង",
     -- 7  Address
-    COALESCE((SELECT a.town_village
+    COALESCE((SELECT a.address_line_1||','||a.address_line_2||','||a.address_line_3
               FROM m_client_address ca
               JOIN m_address a ON a.id = ca.address_id
               WHERE ca.client_id = mc.id AND ca.is_active = true
@@ -134,7 +135,9 @@ SELECT
     sched.interest_due                                AS "ការប្រាក់",
     -- 19 Total due (as of endDate)
     sched.principal_due + sched.interest_due          AS "សរុប",
-    -- 20 Loan officer — header only. The PDF layout in sample/expect-repayment-template.sql lifts this column
+    -- 20 Note — deliberately empty: the printed sheet carries a blank write-in column, as the original did.
+    ''::text                                          AS "ចំណាំ",
+    -- 21 Loan officer — header only. The PDF layout in sample/expect-repayment-template.sql lifts this column
     --    into the sheet header and removes it from the table, so it costs no width on the printed page.
     COALESCE(ms.display_name,'-')                     AS "មន្ត្រីឥណទាន"
 FROM m_office mo
@@ -173,7 +176,7 @@ $rpt$;
   /* Khmer needs a font carrying the script's OpenType shaping tables; the renderer image provides these two. */
   body {
     font-family: "Noto Sans Khmer", "Khmer OS Battambang", "Khmer OS", "Noto Sans", "DejaVu Sans", sans-serif;
-    font-size: 7pt;
+    font-size: 9pt;
     color: #000;
     margin: 0;
   }
@@ -227,19 +230,19 @@ $rpt$;
   .empty { padding: 16px; text-align: center; color: #777; font-style: italic; }
 
   /* Column widths, in the order the report SELECT lists them, taken from the vertical rules of
-     sample/expect-repayment.pdf and rescaled over 19 columns — the PDF carries a 20th, blank, write-in
-     column this report has no data for. The loan officer column is left unsized: the script removes it. */
+     sample/expect-repayment.pdf — 20 columns, the last of which (ចំណាំ) is the blank write-in column the
+     report emits empty. The loan officer column is left unsized: the script removes it. */
   col:nth-child(1)   { width:  2.63%; }   /* ល.រ */
   col:nth-child(2)   { width:  5.85%; }   /* កាលបរិច្ឆេទ */
   col:nth-child(3)   { width:  4.81%; }   /* កិច្ចសន្យា */
   col:nth-child(4)   { width:  4.61%; }   /* កូដ */
   col:nth-child(5)   { width:  7.22%; }   /* ឈ្មោះអតិថិជន */
-  col:nth-child(6)   { width: 10.49%; }   /* ទំនាក់ទំនង */
+  col:nth-child(6)   { width:  6.49%; }   /* ទំនាក់ទំនង -4 */
   col:nth-child(7)   { width:  9.19%; }   /* អាសយដ្ឋាន */
   col:nth-child(8)   { width:  5.11%; }   /* ទឹកប្រាក់ខ្ចី */
   col:nth-child(9)   { width:  3.69%; }   /* រយៈពេល */
   col:nth-child(10)  { width:  5.12%; }   /* ទឹកប្រាក់ត្រូវបង់ */
-  col:nth-child(11)  { width:  5.93%; }   /* ប្រភេទកម្ចី */
+  col:nth-child(11)  { width:  3.93%; }   /* ប្រភេទកម្ចី -2 */
   col:nth-child(12)  { width:  2.70%; }   /* យឺត */
   col:nth-child(13)  { width:  3.90%; }   /* បង់រួច */
   col:nth-child(14)  { width:  4.90%; }   /* នៅសល់ */
@@ -248,6 +251,7 @@ $rpt$;
   col:nth-child(17)  { width:  4.61%; }   /* សរុបការ */
   col:nth-child(18)  { width:  4.62%; }   /* ការប្រាក់ */
   col:nth-child(19)  { width:  4.70%; }   /* សរុប */
+  col:nth-child(20)  { width:  6.00%; }   /* ចំណាំ */
 </style>
 </head>
 <body>
@@ -402,4 +406,4 @@ SELECT r.id,
        length(t.text)                                    AS layout_bytes
   FROM stretchy_report r
   LEFT JOIN m_template t ON t.name = r.report_name
- WHERE r.report_name = 'Expected Repayment';   -- <<< SET THIS TOO
+ WHERE r.report_name = 'Expected Payments By Date - Basic';   -- <<< SET THIS TOO
