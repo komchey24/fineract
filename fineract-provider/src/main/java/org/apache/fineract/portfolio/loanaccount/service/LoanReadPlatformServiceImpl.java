@@ -200,6 +200,7 @@ public class LoanReadPlatformServiceImpl implements LoanReadPlatformService, Loa
     private final InterestRefundServiceDelegate interestRefundServiceDelegate;
     private final LoanMaximumAmountCalculator loanMaximumAmountCalculator;
     private final LoanRepaymentScheduleService loanRepaymentScheduleService;
+    private final LoanPrepayChargeService loanPrepayChargeService;
 
     @Override
     public LoanAccountData retrieveOne(final Long loanId) {
@@ -577,15 +578,22 @@ public class LoanReadPlatformServiceImpl implements LoanReadPlatformService, Loa
         final BigDecimal unrecognizedIncomePortion = null;
 
         BigDecimal adjustedChargeAmount = adjustPrepayInstallmentCharge(loan, onDate);
-        BigDecimal totalAdjusted = outstandingAmounts.getTotalOutstanding().getAmount().subtract(adjustedChargeAmount);
+        // settling ahead of maturity attracts the product's prepay penalty, so the amount quoted here has to include it
+        // (refund / goodwill / waiver templates share this method but never settle the loan early)
+        BigDecimal prepayChargeAmount = repaymentTransactionType.isRepayment()
+                ? loanPrepayChargeService.calculatePrepayChargeAmount(loan, onDate, outstandingAmounts)
+                : BigDecimal.ZERO;
+        BigDecimal totalAdjusted = outstandingAmounts.getTotalOutstanding().getAmount().subtract(adjustedChargeAmount)
+                .add(prepayChargeAmount);
 
         return LoanTransactionData.builder().type(transactionType).currency(currencyData).date(earliestUnpaidInstallmentDate)
                 .amount(totalAdjusted).netDisbursalAmount(loan.getNetDisbursalAmount())
                 .principalPortion(outstandingAmounts.principal().getAmount()).interestPortion(outstandingAmounts.interest().getAmount())
                 .feeChargesPortion(outstandingAmounts.feeCharges().getAmount().subtract(adjustedChargeAmount))
-                .penaltyChargesPortion(outstandingAmounts.penaltyCharges().getAmount()).unrecognizedIncomePortion(unrecognizedIncomePortion)
-                .paymentTypeOptions(paymentOptions).externalId(ExternalId.empty()).outstandingLoanBalance(outstandingLoanBalance)
-                .manuallyReversed(false).loanId(loanId).externalLoanId(loan.getExternalId()).build();
+                .penaltyChargesPortion(outstandingAmounts.penaltyCharges().getAmount().add(prepayChargeAmount))
+                .unrecognizedIncomePortion(unrecognizedIncomePortion).paymentTypeOptions(paymentOptions).externalId(ExternalId.empty())
+                .outstandingLoanBalance(outstandingLoanBalance).manuallyReversed(false).loanId(loanId).externalLoanId(loan.getExternalId())
+                .build();
     }
 
     private BigDecimal adjustPrepayInstallmentCharge(Loan loan, final LocalDate onDate) {
@@ -1495,10 +1503,10 @@ public class LoanReadPlatformServiceImpl implements LoanReadPlatformService, Loa
         Collection<ChargeData> chargeOptions = null;
         if (loanProduct.getMultiDisburseLoan()) {
             chargeOptions = this.chargeReadPlatformService.retrieveLoanProductApplicableCharges(productId,
-                    new ChargeTimeType[] { ChargeTimeType.OVERDUE_INSTALLMENT });
+                    new ChargeTimeType[] { ChargeTimeType.OVERDUE_INSTALLMENT, ChargeTimeType.PREPAY_LOAN });
         } else {
-            chargeOptions = this.chargeReadPlatformService.retrieveLoanProductApplicableCharges(productId,
-                    new ChargeTimeType[] { ChargeTimeType.OVERDUE_INSTALLMENT, ChargeTimeType.TRANCHE_DISBURSEMENT });
+            chargeOptions = this.chargeReadPlatformService.retrieveLoanProductApplicableCharges(productId, new ChargeTimeType[] {
+                    ChargeTimeType.OVERDUE_INSTALLMENT, ChargeTimeType.TRANCHE_DISBURSEMENT, ChargeTimeType.PREPAY_LOAN });
         }
 
         Integer loanCycleCounter = null;

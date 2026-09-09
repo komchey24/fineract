@@ -371,7 +371,9 @@ public class LoanAccountData {
 
         final Collection<LoanChargeData> charges = new ArrayList<LoanChargeData>();
         for (final ChargeData charge : product.charges()) {
-            if (!charge.isOverdueInstallmentCharge()) {
+            // overdue and prepay charges are raised by the platform when the triggering event happens, they are never
+            // part of the charges carried over from the product onto a new loan application
+            if (!charge.isOverdueInstallmentCharge() && !charge.isPrepayLoanCharge()) {
                 charges.add(toLoanChargeData(charge));
             }
         }

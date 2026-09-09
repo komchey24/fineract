@@ -24,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.fineract.infrastructure.core.domain.BatchRequestContextHolder;
 import org.apache.fineract.infrastructure.core.domain.FineractRequestContextHolder;
 import org.apache.fineract.organisation.monetary.domain.Money;
+import org.apache.fineract.portfolio.loanaccount.data.OutstandingAmountsDTO;
 import org.apache.fineract.portfolio.loanaccount.data.ScheduleGeneratorDTO;
 import org.apache.fineract.portfolio.loanaccount.service.LoanAssembler;
 import org.apache.fineract.portfolio.loanaccount.service.LoanTransactionProcessingService;
@@ -79,5 +80,27 @@ public class LoanAccountDomainServiceJpaHelper {
             log.warn("Unable to calculate prepayment amount", e);
         }
         return recalculateTill;
+    }
+
+    /**
+     * Works out what settling the loan on {@code transactionDate} would cost, in its own read-only transaction.
+     * <p>
+     * For interest recalculation loans the prepayment calculation reprocesses the schedule and the charges in place, so
+     * it must never run against the entities the caller is about to write. Returns {@code null} when the amount cannot
+     * be established - inside an enclosing batch transaction the loan is simply not visible from here.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public OutstandingAmountsDTO fetchPrepaymentDetailInIsolation(Long loanId, LocalDate transactionDate,
+            ScheduleGeneratorDTO scheduleGeneratorDTO) {
+        if (FineractRequestContextHolder.isBatchRequest() && BatchRequestContextHolder.isEnclosingTransaction()) {
+            return null;
+        }
+        try {
+            Loan loan = loanAssembler.assembleFrom(loanId);
+            return loanTransactionProcessingService.fetchPrepaymentDetail(scheduleGeneratorDTO, transactionDate, loan);
+        } catch (Exception e) {
+            log.warn("Unable to calculate prepayment amount for loan {}", loanId, e);
+            return null;
+        }
     }
 }
