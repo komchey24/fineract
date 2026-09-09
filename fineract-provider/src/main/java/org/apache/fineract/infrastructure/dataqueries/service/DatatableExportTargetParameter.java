@@ -24,6 +24,7 @@ public enum DatatableExportTargetParameter {
 
     CSV("exportCSV"), //
     PDF("exportPDF"), //
+    PDF_TEMPLATE("exportPdfTemplate"), //
     S3("exportS3"), //
     JSON("exportJSON"), //
     PRETTY_JSON("pretty"); //

@@ -133,8 +133,9 @@ public class ExecuteReportMailingJobsTasklet implements Tasklet {
                 final Response processReport = reportingProcessService.processRequest(reportName, reportParams);
                 final Object responseObject = (processReport != null) ? processReport.getEntity() : null;
 
-                if (responseObject != null && responseObject.getClass().equals(ByteArrayOutputStream.class)) {
-                    final ByteArrayOutputStream byteArrayOutputStream = (ByteArrayOutputStream) responseObject;
+                final ByteArrayOutputStream byteArrayOutputStream = asByteArrayOutputStream(responseObject);
+
+                if (byteArrayOutputStream != null) {
                     final Path fileLocation = Path.of(fineractProperties.getContent().getFilesystem().getRootFolder());
                     final Path fileNameWithoutExtension = fileLocation.resolve(reportName);
 
@@ -151,7 +152,7 @@ public class ExecuteReportMailingJobsTasklet implements Tasklet {
                         sendReportFileToEmailRecipients(reportMailingJob, fileName, byteArrayOutputStream, errorLog);
                     }
                 } else {
-                    errorLog.append("Response object entity is not equal to ByteArrayOutputStream ---------- ");
+                    errorLog.append("Response object entity is neither a ByteArrayOutputStream nor a byte[] ---------- ");
                 }
             } else {
                 errorLog.append(ReportingProcessServiceProvider.SERVICE_MISSING).append(reportType);
@@ -193,6 +194,22 @@ public class ExecuteReportMailingJobsTasklet implements Tasklet {
 
         createReportMailingJobRunHistroryAfterJobExecution(reportMailingJob, errorLog, jobStartDateTime,
                 reportMailingJobPreviousRunStatus.getValue());
+    }
+
+    /**
+     * Report export services hand back their payload either as a {@link ByteArrayOutputStream} or, for the templated
+     * PDF export, as a plain {@code byte[]}, which is what JAX-RS can write out over REST.
+     */
+    private ByteArrayOutputStream asByteArrayOutputStream(final Object responseObject) throws IOException {
+        if (responseObject instanceof ByteArrayOutputStream byteArrayOutputStream) {
+            return byteArrayOutputStream;
+        }
+        if (responseObject instanceof byte[] bytes) {
+            final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(bytes.length);
+            byteArrayOutputStream.write(bytes);
+            return byteArrayOutputStream;
+        }
+        return null;
     }
 
     private void sendReportFileToEmailRecipients(final ReportMailingJob reportMailingJob, final Path fileName,

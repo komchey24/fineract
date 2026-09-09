@@ -1,3 +1,4 @@
+#
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements. See the NOTICE file
 # distributed with this work for additional information
@@ -16,35 +17,18 @@
 # under the License.
 #
 
-# FOR TESTING PURPOSES ONLY! NOT SUITABLE FOR PRODUCTION USAGE!
 version: "3.8"
 
 services:
-
-  db:
-    extends:
-      file: ./config/docker/compose/postgresql.yml
-      service: postgresql
-
   gotenberg:
-    extends:
-      file: ./config/docker/compose/gotenberg.yml
-      service: gotenberg
-
-  fineract:
-    extends:
-      file: ./config/docker/compose/fineract.yml
-      service: fineract
-    ports:
-      - "8443:8443"
-    depends_on:
-      db:
-        condition: service_healthy
-      gotenberg:
-        condition: service_healthy
-    env_file:
-      - ./config/docker/env/fineract.env
-      - ./config/docker/env/fineract-common.env
-      - ./config/docker/env/fineract-postgresql.env
-      - ./config/docker/env/fineract-pdf.env
-# FOR TESTING PURPOSES ONLY! NOT SUITABLE FOR PRODUCTION USAGE!
+    build:
+      context: ../gotenberg
+    # Gotenberg exposes a generic conversion API with no authentication of its own; keep it on the internal
+    # compose network and do not publish the port.
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
