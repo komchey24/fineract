@@ -134,6 +134,14 @@ public final class ChargeData implements Comparable<ChargeData>, Serializable {
         return isOverdueInstallmentCharge;
     }
 
+    public boolean isPrepayLoanCharge() {
+        boolean isPrepayLoanCharge = false;
+        if (this.chargeTimeType != null) {
+            isPrepayLoanCharge = ChargeTimeType.fromInt(this.chargeTimeType.getId().intValue()).isPrepayLoan();
+        }
+        return isPrepayLoanCharge;
+    }
+
     public boolean isIsPaymentType() {
         return this.isPaymentType;
     }

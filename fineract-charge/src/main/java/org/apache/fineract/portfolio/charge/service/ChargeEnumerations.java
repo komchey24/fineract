@@ -99,6 +99,10 @@ public final class ChargeEnumerations {
                 optionData = new EnumOptionData(ChargeTimeType.SHARE_REDEEM.getValue().longValue(), ChargeTimeType.SHARE_REDEEM.getCode(),
                         "Share Redeem");
             break;
+            case PREPAY_LOAN:
+                optionData = new EnumOptionData(ChargeTimeType.PREPAY_LOAN.getValue().longValue(), ChargeTimeType.PREPAY_LOAN.getCode(),
+                        "Prepay Loan");
+            break;
             case SAVINGS_NOACTIVITY_FEE:
                 optionData = new EnumOptionData(ChargeTimeType.SAVINGS_NOACTIVITY_FEE.getValue().longValue(),
                         ChargeTimeType.SAVINGS_NOACTIVITY_FEE.getCode(), "Saving No Activity Fee");

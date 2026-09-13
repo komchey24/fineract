@@ -105,6 +105,7 @@ import org.apache.fineract.portfolio.loanaccount.service.LoanBalanceService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanChargeService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanDownPaymentHandlerService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanJournalEntryPoster;
+import org.apache.fineract.portfolio.loanaccount.service.LoanPrepayChargeService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanRefundService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanScheduleService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanTransactionProcessingService;
@@ -147,6 +148,7 @@ public class LoanAccountDomainServiceJpa implements LoanAccountDomainService {
     private final InterestRefundServiceDelegate interestRefundServiceDelegate;
     private final LoanTransactionValidator loanTransactionValidator;
     private final LoanForeclosureValidator loanForeclosureValidator;
+    private final LoanPrepayChargeService loanPrepayChargeService;
     private final LoanDownPaymentTransactionValidator loanDownPaymentTransactionValidator;
     private final LoanChargeService loanChargeService;
     private final LoanScheduleService loanScheduleService;
@@ -254,6 +256,11 @@ public class LoanAccountDomainServiceJpa implements LoanAccountDomainService {
 
         final ScheduleGeneratorDTO scheduleGeneratorDTO = this.loanUtilService.buildScheduleGeneratorDTO(loan, recalculateFrom,
                 recalculateTill, holidayDetailDto);
+
+        if (repaymentTransactionType.isRepayment() && !isRecoveryRepayment) {
+            // has to happen before the transaction is allocated, so that the repayment settles the prepay penalty too
+            loanPrepayChargeService.applyPrepayChargeIfApplicable(loan, transactionDate, repaymentAmount, scheduleGeneratorDTOForPrepay);
+        }
 
         if (!isHolidayValidationDone) {
             final HolidayDetailDTO holidayDetailDTO = scheduleGeneratorDTO.getHolidayDetailDTO();
