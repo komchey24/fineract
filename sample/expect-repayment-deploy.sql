@@ -258,19 +258,19 @@ $rpt$;
   col:nth-child(5)   { width:  7.22%; }   /* ឈ្មោះអតិថិជន */
   col:nth-child(6)   { width:  6.49%; }   /* ទំនាក់ទំនង */
   col:nth-child(7)   { width:  9.19%; }   /* អាសយដ្ឋាន */
-  col:nth-child(8)   { width:  5.11%; }   /* ទឹកប្រាក់ខ្ចី */
+  col:nth-child(8)   { width:  6.11%; }   /* ទឹកប្រាក់ខ្ចី +1*/
   col:nth-child(9)   { width:  3.69%; }   /* រយៈពេល */
-  col:nth-child(10)  { width:  5.12%; }   /* ទឹកប្រាក់ត្រូវបង់ */
+  col:nth-child(10)  { width:  5.12%; }   /* ត្រូវបង់ */
   col:nth-child(11)  { width:  3.93%; }   /* ប្រភេទកម្ចី */
   col:nth-child(12)  { width:  2.70%; }   /* យឺត */
-  col:nth-child(13)  { width:  3.90%; }   /* បង់រួច */
-  col:nth-child(14)  { width:  4.90%; }   /* នៅសល់ */
-  col:nth-child(15)  { width:  5.01%; }   /* សរុបដើម */
-  col:nth-child(16)  { width:  4.92%; }   /* សរុបការ */
-  col:nth-child(17)  { width:  4.61%; }   /* សរុប */
+  col:nth-child(13)  { width:  2.90%; }   /* បង់រួច -1*/
+  col:nth-child(14)  { width:  2.90%; }   /* នៅ សល់ -2*/
+  col:nth-child(15)  { width:  6.01%; }   /* សរុបដើម +1*/
+  col:nth-child(16)  { width:  5.92%; }   /* សរុបការ +1*/
+  col:nth-child(17)  { width:  5.61%; }   /* សរុប +1*/
   col:nth-child(18)  { width:  4.62%; }   /* បង់លើស */
   col:nth-child(19)  { width:  4.70%; }   /* បង់ខ្វះ */
-  col:nth-child(20)  { width:  6.85%; }   /* ចំណាំ — takes the width freed by the shorter date */
+  col:nth-child(20)  { width:  5.85%; }   /* ចំណាំ —1 takes the width freed by the shorter date */
 </style>
 </head>
 <body>
