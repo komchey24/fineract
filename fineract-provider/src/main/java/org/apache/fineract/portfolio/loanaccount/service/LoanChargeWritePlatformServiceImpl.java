@@ -1012,6 +1012,9 @@ public class LoanChargeWritePlatformServiceImpl implements LoanChargeWritePlatfo
             final String defaultUserMessage = "Installment charge cannot be added to the loan.";
             throw new LoanChargeCannotBeAddedException("loanCharge", "overdue.charge", defaultUserMessage, null,
                     chargeDefinition.getName());
+        } else if (chargeDefinition.isPrepayLoan()) {
+            final String defaultUserMessage = "Prepay loan charge cannot be added to the loan.";
+            throw new LoanChargeCannotBeAddedException("loanCharge", "prepay.charge", defaultUserMessage, null, chargeDefinition.getName());
         } else if (loanCharge.getDueLocalDate() != null) {
             // TODO: Review, error message seems not valid if interest recalculation is not enabled.
             boolean isCumulative = loan.getLoanRepaymentScheduleDetail().getLoanScheduleType().equals(LoanScheduleType.CUMULATIVE);

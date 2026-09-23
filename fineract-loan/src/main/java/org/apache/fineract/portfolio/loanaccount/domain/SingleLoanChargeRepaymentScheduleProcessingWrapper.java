@@ -118,7 +118,7 @@ public class SingleLoanChargeRepaymentScheduleProcessingWrapper {
             return zero;
         }
         ChargeCalculationType calculationType = loanCharge.getChargeCalculation();
-        if (loanCharge.isOverdueInstallmentCharge() && calculationType.isPercentageBased()) {
+        if (loanCharge.hasPreCalculatedChargeAmount() && calculationType.isPercentageBased()) {
             return Money.of(currency, loanCharge.chargeAmount());
         }
         if (calculationType.isFlat()) {

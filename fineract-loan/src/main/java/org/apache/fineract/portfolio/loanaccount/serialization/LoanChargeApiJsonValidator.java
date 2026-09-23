@@ -387,6 +387,11 @@ public final class LoanChargeApiJsonValidator {
                         throw new LoanChargeCannotBeAddedException("loanCharge", "overdue.charge", defaultUserMessage, null,
                                 chargeDefinition.getName());
                     }
+                    if (chargeDefinition.isPrepayLoan()) {
+                        final String defaultUserMessage = "Prepay loan charge cannot be added to the loan.";
+                        throw new LoanChargeCannotBeAddedException("loanCharge", "prepay.charge", defaultUserMessage, null,
+                                chargeDefinition.getName());
+                    }
                     final BigDecimal amount = this.fromApiJsonHelper.extractBigDecimalNamed(LoanApiConstants.amountParameterName,
                             loanChargeElement, locale);
                     baseDataValidator.reset().parameter(LoanApiConstants.chargesParameterName)

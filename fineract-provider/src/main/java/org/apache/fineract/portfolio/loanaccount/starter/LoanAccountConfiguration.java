@@ -151,6 +151,7 @@ import org.apache.fineract.portfolio.loanaccount.service.LoanJournalEntryPoster;
 import org.apache.fineract.portfolio.loanaccount.service.LoanMaximumAmountCalculator;
 import org.apache.fineract.portfolio.loanaccount.service.LoanOfficerService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanOriginatorLinkingService;
+import org.apache.fineract.portfolio.loanaccount.service.LoanPrepayChargeService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanReadPlatformService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanReadPlatformServiceImpl;
 import org.apache.fineract.portfolio.loanaccount.service.LoanRefundService;
@@ -353,7 +354,7 @@ public class LoanAccountConfiguration {
             LoanBalanceService loanBalanceService, LoanCapitalizedIncomeBalanceRepository loanCapitalizedIncomeBalanceRepository,
             LoanBuyDownFeeBalanceRepository loanBuyDownFeeBalanceRepository,
             @Lazy InterestRefundServiceDelegate interestRefundServiceDelegate, LoanMaximumAmountCalculator loanMaximumAmountCalculator,
-            LoanRepaymentScheduleService loanRepaymentScheduleService) {
+            LoanRepaymentScheduleService loanRepaymentScheduleService, @Lazy LoanPrepayChargeService loanPrepayChargeService) {
         return new LoanReadPlatformServiceImpl(jdbcTemplate, context, loanRepositoryWrapper, applicationCurrencyRepository,
                 loanProductReadPlatformService, clientReadPlatformService, groupReadPlatformService, loanDropdownReadPlatformService,
                 fundReadPlatformService, chargeReadPlatformService, codeValueReadPlatformService, calendarReadPlatformService,
@@ -362,7 +363,7 @@ public class LoanAccountConfiguration {
                 delinquencyReadPlatformService, loanTransactionRepository, loanChargePaidByReadService, loanTransactionRelationReadService,
                 loanForeclosureValidator, loanTransactionMapper, loanTransactionProcessingService, loanBalanceService,
                 loanCapitalizedIncomeBalanceRepository, loanBuyDownFeeBalanceRepository, interestRefundServiceDelegate,
-                loanMaximumAmountCalculator, loanRepaymentScheduleService);
+                loanMaximumAmountCalculator, loanRepaymentScheduleService, loanPrepayChargeService);
     }
 
     @Bean

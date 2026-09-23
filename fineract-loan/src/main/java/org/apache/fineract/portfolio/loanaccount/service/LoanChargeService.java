@@ -224,7 +224,7 @@ public class LoanChargeService {
             chargeAmt = loanCharge.getPercentage();
             if (loanCharge.isInstalmentFee()) {
                 totalChargeAmt = calculatePerInstallmentChargeAmount(loan, loanCharge);
-            } else if (loanCharge.isOverdueInstallmentCharge()) {
+            } else if (loanCharge.hasPreCalculatedChargeAmount()) {
                 totalChargeAmt = loanCharge.amountOutstanding();
             }
         } else {
@@ -252,7 +252,9 @@ public class LoanChargeService {
     }
 
     public BigDecimal calculateAmountPercentageAppliedTo(final Loan loan, final LoanCharge loanCharge) {
-        if (loanCharge.isOverdueInstallmentCharge()) {
+        // these charges are raised against the loan balance as of the day they are applied, so the base was already
+        // worked out by the caller and must not be re-derived from the disbursed principal
+        if (loanCharge.hasPreCalculatedChargeAmount()) {
             return loanCharge.getAmountPercentageAppliedTo();
         }
 
@@ -529,7 +531,8 @@ public class LoanChargeService {
         loanCharge.setChargeTime(chargeTime == null ? chargeDefinition.getChargeTimeType() : chargeTime.getValue());
 
         if (loanCharge.getChargeTimeType().equals(ChargeTimeType.SPECIFIED_DUE_DATE)
-                || loanCharge.getChargeTimeType().equals(ChargeTimeType.OVERDUE_INSTALLMENT)) {
+                || loanCharge.getChargeTimeType().equals(ChargeTimeType.OVERDUE_INSTALLMENT)
+                || loanCharge.getChargeTimeType().equals(ChargeTimeType.PREPAY_LOAN)) {
 
             if (dueDate == null) {
                 final String defaultUserMessage = "Loan charge is missing due date.";

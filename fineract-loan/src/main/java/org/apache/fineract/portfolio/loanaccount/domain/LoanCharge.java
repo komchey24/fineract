@@ -264,6 +264,19 @@ public class LoanCharge extends AbstractAuditableWithUTCDateTimeCustom<Long> {
         return ChargeTimeType.fromInt(this.chargeTime).equals(ChargeTimeType.OVERDUE_INSTALLMENT);
     }
 
+    public boolean isPrepayLoanCharge() {
+        return ChargeTimeType.fromInt(this.chargeTime).equals(ChargeTimeType.PREPAY_LOAN);
+    }
+
+    /**
+     * Charges whose amount is worked out against the loan state at the moment they get applied (rather than against the
+     * disbursed principal / full term interest) already carry their final amount, so the repayment schedule must take
+     * {@link #chargeAmount()} as-is instead of re-deriving the percentage.
+     */
+    public boolean hasPreCalculatedChargeAmount() {
+        return isOverdueInstallmentCharge() || isPrepayLoanCharge();
+    }
+
     private static boolean isGreaterThanZero(final BigDecimal value) {
         return value.compareTo(BigDecimal.ZERO) > 0;
     }
