@@ -30,17 +30,30 @@ WITH sched AS (
                     - COALESCE(r.interest_waived_derived,0)
                     - COALESCE(r.interest_writtenoff_derived,0)
                  ELSE 0 END) AS interest_outstanding,
-        SUM(CASE WHEN NOT r.completed_derived AND r.duedate <= ${endDate}::date
+        -- Shortfall left on installments the client has only partly settled: the unpaid remainder of
+        -- every open installment that has already received money. An installment nobody has paid
+        -- anything towards is not a short payment, so it is excluded.
+        SUM(CASE WHEN NOT r.completed_derived
+                      AND COALESCE(r.principal_completed_derived,0)
+                        + COALESCE(r.interest_completed_derived,0)
+                        + COALESCE(r.fee_charges_completed_derived,0)
+                        + COALESCE(r.penalty_charges_completed_derived,0) > 0
                  THEN COALESCE(r.principal_amount,0)
                     - COALESCE(r.principal_completed_derived,0)
                     - COALESCE(r.principal_writtenoff_derived,0)
-                 ELSE 0 END) AS principal_due,
-        SUM(CASE WHEN NOT r.completed_derived AND r.duedate <= ${endDate}::date
-                 THEN COALESCE(r.interest_amount,0)
+                    + COALESCE(r.interest_amount,0)
                     - COALESCE(r.interest_completed_derived,0)
                     - COALESCE(r.interest_waived_derived,0)
                     - COALESCE(r.interest_writtenoff_derived,0)
-                 ELSE 0 END) AS interest_due,
+                    + COALESCE(r.fee_charges_amount,0)
+                    - COALESCE(r.fee_charges_completed_derived,0)
+                    - COALESCE(r.fee_charges_waived_derived,0)
+                    - COALESCE(r.fee_charges_writtenoff_derived,0)
+                    + COALESCE(r.penalty_charges_amount,0)
+                    - COALESCE(r.penalty_charges_completed_derived,0)
+                    - COALESCE(r.penalty_charges_waived_derived,0)
+                    - COALESCE(r.penalty_charges_writtenoff_derived,0)
+                 ELSE 0 END) AS partial_shortfall,
         MIN(CASE WHEN NOT r.completed_derived THEN r.duedate END) AS next_duedate
     FROM m_loan_repayment_schedule r
     WHERE r.installment > 0
@@ -93,16 +106,17 @@ SELECT
     sched.paid_installments                           AS "បង់រួច",
     -- 14 Unpaid installments
     sched.remaining_installments                      AS "នៅសល់",
-    -- 15 Total principal due
+    -- 15 Total principal outstanding
     sched.principal_outstanding                       AS "សរុបដើម",
-    -- 16 Principal due (as of endDate)
-    sched.principal_due                               AS "ប្រាក់ដើម",
-    -- 17 Total interest due
+    -- 16 Total interest outstanding
     sched.interest_outstanding                        AS "សរុបការ",
-    -- 18 Interest due (as of endDate)
-    sched.interest_due                                AS "ការប្រាក់",
-    -- 19 Total due (as of endDate)
-    sched.principal_due + sched.interest_due          AS "សរុប",
+    -- 17 Total outstanding — the same figure the PDF header sums into ទឹកប្រាក់នៅសល់សរុប
+    sched.principal_outstanding
+      + sched.interest_outstanding                    AS "សរុប",
+    -- 18 Over paid — the loan's credit balance, i.e. money received beyond what the loan owes
+    COALESCE(ml.total_overpaid_derived,0)             AS "បង់លើស",
+    -- 19 Short paid — what is still owed on installments that were paid only in part
+    sched.partial_shortfall                           AS "បង់ខ្វះ",
     -- 20 Note — deliberately empty: the printed sheet carries a blank write-in column, as the original did.
     ''::text                                          AS "ចំណាំ",
     -- 21 Loan officer — header only. The PDF layout in sample/expect-repayment-template.sql lifts this column

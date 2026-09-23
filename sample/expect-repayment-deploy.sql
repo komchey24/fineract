@@ -62,17 +62,30 @@ DECLARE
                     - COALESCE(r.interest_waived_derived,0)
                     - COALESCE(r.interest_writtenoff_derived,0)
                  ELSE 0 END) AS interest_outstanding,
-        SUM(CASE WHEN NOT r.completed_derived AND r.duedate <= ${endDate}::date
+        -- Shortfall left on installments the client has only partly settled: the unpaid remainder of
+        -- every open installment that has already received money. An installment nobody has paid
+        -- anything towards is not a short payment, so it is excluded.
+        SUM(CASE WHEN NOT r.completed_derived
+                      AND COALESCE(r.principal_completed_derived,0)
+                        + COALESCE(r.interest_completed_derived,0)
+                        + COALESCE(r.fee_charges_completed_derived,0)
+                        + COALESCE(r.penalty_charges_completed_derived,0) > 0
                  THEN COALESCE(r.principal_amount,0)
                     - COALESCE(r.principal_completed_derived,0)
                     - COALESCE(r.principal_writtenoff_derived,0)
-                 ELSE 0 END) AS principal_due,
-        SUM(CASE WHEN NOT r.completed_derived AND r.duedate <= ${endDate}::date
-                 THEN COALESCE(r.interest_amount,0)
+                    + COALESCE(r.interest_amount,0)
                     - COALESCE(r.interest_completed_derived,0)
                     - COALESCE(r.interest_waived_derived,0)
                     - COALESCE(r.interest_writtenoff_derived,0)
-                 ELSE 0 END) AS interest_due,
+                    + COALESCE(r.fee_charges_amount,0)
+                    - COALESCE(r.fee_charges_completed_derived,0)
+                    - COALESCE(r.fee_charges_waived_derived,0)
+                    - COALESCE(r.fee_charges_writtenoff_derived,0)
+                    + COALESCE(r.penalty_charges_amount,0)
+                    - COALESCE(r.penalty_charges_completed_derived,0)
+                    - COALESCE(r.penalty_charges_waived_derived,0)
+                    - COALESCE(r.penalty_charges_writtenoff_derived,0)
+                 ELSE 0 END) AS partial_shortfall,
         MIN(CASE WHEN NOT r.completed_derived THEN r.duedate END) AS next_duedate
     FROM m_loan_repayment_schedule r
     WHERE r.installment > 0
@@ -125,16 +138,17 @@ SELECT
     sched.paid_installments                           AS "បង់រួច",
     -- 14 Unpaid installments
     sched.remaining_installments                      AS "នៅសល់",
-    -- 15 Total principal due
+    -- 15 Total principal outstanding
     sched.principal_outstanding                       AS "សរុបដើម",
-    -- 16 Principal due (as of endDate)
-    sched.principal_due                               AS "ប្រាក់ដើម",
-    -- 17 Total interest due
+    -- 16 Total interest outstanding
     sched.interest_outstanding                        AS "សរុបការ",
-    -- 18 Interest due (as of endDate)
-    sched.interest_due                                AS "ការប្រាក់",
-    -- 19 Total due (as of endDate)
-    sched.principal_due + sched.interest_due          AS "សរុប",
+    -- 17 Total outstanding — the same figure the PDF header sums into ទឹកប្រាក់នៅសល់សរុប
+    sched.principal_outstanding
+      + sched.interest_outstanding                    AS "សរុប",
+    -- 18 Over paid — the loan's credit balance, i.e. money received beyond what the loan owes
+    COALESCE(ml.total_overpaid_derived,0)             AS "បង់លើស",
+    -- 19 Short paid — what is still owed on installments that were paid only in part
+    sched.partial_shortfall                           AS "បង់ខ្វះ",
     -- 20 Note — deliberately empty: the printed sheet carries a blank write-in column, as the original did.
     ''::text                                          AS "ចំណាំ",
     -- 21 Loan officer — header only. The PDF layout in sample/expect-repayment-template.sql lifts this column
@@ -229,29 +243,29 @@ $rpt$;
   }
   .empty { padding: 16px; text-align: center; color: #777; font-style: italic; }
 
-  /* Column widths, in the order the report SELECT lists them, taken from the vertical rules of
+  /* Column widths, in the order the report SELECT lists them, based on the vertical rules of
      sample/expect-repayment.pdf — 20 columns, the last of which (ចំណាំ) is the blank write-in column the
      report emits empty. The loan officer column is left unsized: the script removes it. */
   col:nth-child(1)   { width:  2.63%; }   /* ល.រ */
-  col:nth-child(2)   { width:  5.85%; }   /* កាលបរិច្ឆេទ */
+  col:nth-child(2)   { width:  5.00%; }   /* កាលបរិច្ឆេទ — dd/MM/yy, so it needs less width than the ISO date did */
   col:nth-child(3)   { width:  4.81%; }   /* កិច្ចសន្យា */
   col:nth-child(4)   { width:  4.61%; }   /* កូដ */
   col:nth-child(5)   { width:  7.22%; }   /* ឈ្មោះអតិថិជន */
-  col:nth-child(6)   { width:  6.49%; }   /* ទំនាក់ទំនង -4 */
+  col:nth-child(6)   { width:  6.49%; }   /* ទំនាក់ទំនង */
   col:nth-child(7)   { width:  9.19%; }   /* អាសយដ្ឋាន */
   col:nth-child(8)   { width:  5.11%; }   /* ទឹកប្រាក់ខ្ចី */
   col:nth-child(9)   { width:  3.69%; }   /* រយៈពេល */
   col:nth-child(10)  { width:  5.12%; }   /* ទឹកប្រាក់ត្រូវបង់ */
-  col:nth-child(11)  { width:  3.93%; }   /* ប្រភេទកម្ចី -2 */
+  col:nth-child(11)  { width:  3.93%; }   /* ប្រភេទកម្ចី */
   col:nth-child(12)  { width:  2.70%; }   /* យឺត */
   col:nth-child(13)  { width:  3.90%; }   /* បង់រួច */
   col:nth-child(14)  { width:  4.90%; }   /* នៅសល់ */
   col:nth-child(15)  { width:  5.01%; }   /* សរុបដើម */
-  col:nth-child(16)  { width:  4.92%; }   /* ប្រាក់ដើម */
-  col:nth-child(17)  { width:  4.61%; }   /* សរុបការ */
-  col:nth-child(18)  { width:  4.62%; }   /* ការប្រាក់ */
-  col:nth-child(19)  { width:  4.70%; }   /* សរុប */
-  col:nth-child(20)  { width:  6.00%; }   /* ចំណាំ */
+  col:nth-child(16)  { width:  4.92%; }   /* សរុបការ */
+  col:nth-child(17)  { width:  4.61%; }   /* សរុប */
+  col:nth-child(18)  { width:  4.62%; }   /* បង់លើស */
+  col:nth-child(19)  { width:  4.70%; }   /* បង់ខ្វះ */
+  col:nth-child(20)  { width:  6.85%; }   /* ចំណាំ — takes the width freed by the shorter date */
 </style>
 </head>
 <body>
@@ -290,7 +304,7 @@ $rpt$;
  * that into the printed sheet, and Gotenberg's Chromium runs it before it takes the page snapshot.
  *
  *  1. formats every numeric cell with thousand separators and no decimals,
- *  2. rewrites ISO dates as dd/MM/yyyy, in the cells and in the header period,
+ *  2. rewrites ISO dates as dd/MM/yy — a two-digit year, to keep the date column narrow,
  *  3. totals the two outstanding columns — principal (សរុបដើម) plus interest (សរុបការ) — into the header,
  *  4. lifts the loan officer column into the header and removes it from the table.
  *
@@ -309,7 +323,7 @@ $rpt$;
 
   function asDayFirst(text) {
     var parts = ISO_DATE.exec(text);
-    return parts ? parts[3] + '/' + parts[2] + '/' + parts[1] : null;
+    return parts ? parts[3] + '/' + parts[2] + '/' + parts[1].slice(2) : null;
   }
 
   ['start-date', 'end-date'].forEach(function (id) {

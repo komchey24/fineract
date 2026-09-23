@@ -111,11 +111,11 @@ INSERT INTO m_template (name, entity, type, text) VALUES ('Expected Repayment', 
   }
   .empty { padding: 16px; text-align: center; color: #777; font-style: italic; }
 
-  /* Column widths, in the order the report SELECT lists them, taken from the vertical rules of
+  /* Column widths, in the order the report SELECT lists them, based on the vertical rules of
      sample/expect-repayment.pdf — 20 columns, the last of which (ចំណាំ) is the blank write-in column the
      report emits empty. The loan officer column is left unsized: the script removes it. */
   col:nth-child(1)   { width:  2.63%; }   /* ល.រ */
-  col:nth-child(2)   { width:  5.85%; }   /* កាលបរិច្ឆេទ */
+  col:nth-child(2)   { width:  5.00%; }   /* កាលបរិច្ឆេទ — dd/MM/yy, so it needs less width than the ISO date did */
   col:nth-child(3)   { width:  4.81%; }   /* កិច្ចសន្យា */
   col:nth-child(4)   { width:  4.61%; }   /* កូដ */
   col:nth-child(5)   { width:  7.22%; }   /* ឈ្មោះអតិថិជន */
@@ -129,11 +129,11 @@ INSERT INTO m_template (name, entity, type, text) VALUES ('Expected Repayment', 
   col:nth-child(13)  { width:  3.90%; }   /* បង់រួច */
   col:nth-child(14)  { width:  4.90%; }   /* នៅសល់ */
   col:nth-child(15)  { width:  5.01%; }   /* សរុបដើម */
-  col:nth-child(16)  { width:  4.92%; }   /* ប្រាក់ដើម */
-  col:nth-child(17)  { width:  4.61%; }   /* សរុបការ */
-  col:nth-child(18)  { width:  4.62%; }   /* ការប្រាក់ */
-  col:nth-child(19)  { width:  4.70%; }   /* សរុប */
-  col:nth-child(20)  { width:  6.00%; }   /* ចំណាំ */
+  col:nth-child(16)  { width:  4.92%; }   /* សរុបការ */
+  col:nth-child(17)  { width:  4.61%; }   /* សរុប */
+  col:nth-child(18)  { width:  4.62%; }   /* បង់លើស */
+  col:nth-child(19)  { width:  4.70%; }   /* បង់ខ្វះ */
+  col:nth-child(20)  { width:  6.85%; }   /* ចំណាំ — takes the width freed by the shorter date */
 </style>
 </head>
 <body>
@@ -172,7 +172,7 @@ INSERT INTO m_template (name, entity, type, text) VALUES ('Expected Repayment', 
  * that into the printed sheet, and Gotenberg's Chromium runs it before it takes the page snapshot.
  *
  *  1. formats every numeric cell with thousand separators and no decimals,
- *  2. rewrites ISO dates as dd/MM/yyyy, in the cells and in the header period,
+ *  2. rewrites ISO dates as dd/MM/yy — a two-digit year, to keep the date column narrow,
  *  3. totals the two outstanding columns — principal (សរុបដើម) plus interest (សរុបការ) — into the header,
  *  4. lifts the loan officer column into the header and removes it from the table.
  *
@@ -191,7 +191,7 @@ INSERT INTO m_template (name, entity, type, text) VALUES ('Expected Repayment', 
 
   function asDayFirst(text) {
     var parts = ISO_DATE.exec(text);
-    return parts ? parts[3] + '/' + parts[2] + '/' + parts[1] : null;
+    return parts ? parts[3] + '/' + parts[2] + '/' + parts[1].slice(2) : null;
   }
 
   ['start-date', 'end-date'].forEach(function (id) {
