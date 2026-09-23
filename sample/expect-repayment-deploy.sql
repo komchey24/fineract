@@ -62,14 +62,18 @@ DECLARE
                     - COALESCE(r.interest_waived_derived,0)
                     - COALESCE(r.interest_writtenoff_derived,0)
                  ELSE 0 END) AS interest_outstanding,
-        -- Shortfall left on installments the client has only partly settled: the unpaid remainder of
-        -- every open installment that has already received money. An installment nobody has paid
-        -- anything towards is not a short payment, so it is excluded.
+        -- Money already sitting on installments the client has not finished paying, put there before the
+        -- installment came due. This is the same figure the Repayment Schedule screen prints in its
+        -- "In advance" column (LoanReadPlatformServiceImpl reads ls.total_paid_in_advance_derived for it).
+        -- Fineract stamps it when the payment lands and only unwinds it on reversal, so the NOT completed
+        -- filter is what keeps it to money still working ahead rather than the loan's lifetime total.
         SUM(CASE WHEN NOT r.completed_derived
-                      AND COALESCE(r.principal_completed_derived,0)
-                        + COALESCE(r.interest_completed_derived,0)
-                        + COALESCE(r.fee_charges_completed_derived,0)
-                        + COALESCE(r.penalty_charges_completed_derived,0) > 0
+                 THEN COALESCE(r.total_paid_in_advance_derived,0)
+                 ELSE 0 END) AS paid_in_advance,
+        -- What an earlier collection left behind: the unpaid part of installments whose due date has
+        -- already gone by. Today's installment is not counted -- it is not short until the day is out --
+        -- so this reads as "collect this on top of today's amount".
+        SUM(CASE WHEN NOT r.completed_derived AND r.duedate < ${endDate}::date
                  THEN COALESCE(r.principal_amount,0)
                     - COALESCE(r.principal_completed_derived,0)
                     - COALESCE(r.principal_writtenoff_derived,0)
@@ -85,7 +89,7 @@ DECLARE
                     - COALESCE(r.penalty_charges_completed_derived,0)
                     - COALESCE(r.penalty_charges_waived_derived,0)
                     - COALESCE(r.penalty_charges_writtenoff_derived,0)
-                 ELSE 0 END) AS partial_shortfall,
+                 ELSE 0 END) AS short_paid,
         MIN(CASE WHEN NOT r.completed_derived THEN r.duedate END) AS next_duedate
     FROM m_loan_repayment_schedule r
     WHERE r.installment > 0
@@ -145,10 +149,11 @@ SELECT
     -- 17 Total outstanding — the same figure the PDF header sums into ទឹកប្រាក់នៅសល់សរុប
     sched.principal_outstanding
       + sched.interest_outstanding                    AS "សរុប",
-    -- 18 Over paid — the loan's credit balance, i.e. money received beyond what the loan owes
-    COALESCE(ml.total_overpaid_derived,0)             AS "បង់លើស",
-    -- 19 Short paid — what is still owed on installments that were paid only in part
-    sched.partial_shortfall                           AS "បង់ខ្វះ",
+    -- 18 Over paid — already paid ahead, so the officer collects this much LESS today. Matches the
+    --    "In advance" column of the loan's Repayment Schedule screen.
+    sched.paid_in_advance                             AS "បង់លើស",
+    -- 19 Short paid — left over from an earlier collection, so the officer collects this much MORE today.
+    sched.short_paid                                  AS "បង់ខ្វះ",
     -- 20 Note — deliberately empty: the printed sheet carries a blank write-in column, as the original did.
     ''::text                                          AS "ចំណាំ",
     -- 21 Loan officer — header only. The PDF layout in sample/expect-repayment-template.sql lifts this column
