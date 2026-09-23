@@ -98,8 +98,13 @@ SELECT
     ml.principal_amount                               AS "ទឹកប្រាក់ខ្ចី",
     -- 9  Term
     ml.number_of_repayments                           AS "រយៈពេល",
-    -- 10 Due amount (installment)
-    inst.installment_amount                           AS "ទឹកប្រាក់ត្រូវបង់",
+    -- 10 Amount to collect on this visit: one installment, less whatever the client has already paid
+    --    ahead (បង់លើស), plus whatever an earlier collection left behind (បង់ខ្វះ). Those two columns are
+    --    printed beside it so the officer can see how the figure was arrived at. Floored at zero: a client
+    --    far enough ahead owes nothing today, and a negative would read as if the branch owed them money.
+    GREATEST(inst.installment_amount
+             - sched.paid_in_advance
+             + sched.short_paid, 0)                   AS "ទឹកប្រាក់ត្រូវបង់",
     -- 11 Type
     CASE ml.repayment_period_frequency_enum
          WHEN 0 THEN 'ថ្ងៃ' WHEN 1 THEN 'សប្តាហ៍'
