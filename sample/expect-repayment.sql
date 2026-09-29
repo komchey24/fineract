@@ -38,30 +38,37 @@ WITH sched AS (
         SUM(CASE WHEN NOT r.completed_derived
                  THEN COALESCE(r.total_paid_in_advance_derived,0)
                  ELSE 0 END) AS paid_in_advance,
-        -- What an earlier collection left behind: the unpaid part of installments whose due date has
-        -- already gone by. Today's installment is not counted -- it is not short until the day is out --
-        -- so this reads as "collect this on top of today's amount".
-        SUM(CASE WHEN NOT r.completed_derived AND r.duedate < ${endDate}::date
-                 THEN COALESCE(r.principal_amount,0)
-                    - COALESCE(r.principal_completed_derived,0)
-                    - COALESCE(r.principal_writtenoff_derived,0)
-                    + COALESCE(r.interest_amount,0)
-                    - COALESCE(r.interest_completed_derived,0)
-                    - COALESCE(r.interest_waived_derived,0)
-                    - COALESCE(r.interest_writtenoff_derived,0)
-                    + COALESCE(r.fee_charges_amount,0)
-                    - COALESCE(r.fee_charges_completed_derived,0)
-                    - COALESCE(r.fee_charges_waived_derived,0)
-                    - COALESCE(r.fee_charges_writtenoff_derived,0)
-                    + COALESCE(r.penalty_charges_amount,0)
-                    - COALESCE(r.penalty_charges_completed_derived,0)
-                    - COALESCE(r.penalty_charges_waived_derived,0)
-                    - COALESCE(r.penalty_charges_writtenoff_derived,0)
-                 ELSE 0 END) AS short_paid,
         MIN(CASE WHEN NOT r.completed_derived THEN r.duedate END) AS next_duedate
     FROM m_loan_repayment_schedule r
     WHERE r.installment > 0
     GROUP BY r.loan_id
+),
+-- Short paid looks at one installment only: the most recent one already due before the report date.
+-- It counts only when that installment was paid PARTIALLY -- something was paid, but less than the
+-- installment amount. Paid in full (or not paid at all) prints 0; older arrears do not pile in here.
+last_due AS (
+    SELECT DISTINCT ON (r.loan_id) r.loan_id,
+           COALESCE(r.principal_amount,0) + COALESCE(r.interest_amount,0)
+         + COALESCE(r.fee_charges_amount,0) + COALESCE(r.penalty_charges_amount,0)
+         - COALESCE(r.principal_writtenoff_derived,0)
+         - COALESCE(r.interest_waived_derived,0)     - COALESCE(r.interest_writtenoff_derived,0)
+         - COALESCE(r.fee_charges_waived_derived,0)  - COALESCE(r.fee_charges_writtenoff_derived,0)
+         - COALESCE(r.penalty_charges_waived_derived,0) - COALESCE(r.penalty_charges_writtenoff_derived,0)
+                                                     AS due_amount,
+           COALESCE(r.principal_completed_derived,0) + COALESCE(r.interest_completed_derived,0)
+         + COALESCE(r.fee_charges_completed_derived,0) + COALESCE(r.penalty_charges_completed_derived,0)
+                                                     AS paid_amount
+    FROM m_loan_repayment_schedule r
+    WHERE r.installment > 0
+      AND r.duedate < ${endDate}::date
+    ORDER BY r.loan_id, r.duedate DESC, r.installment DESC
+),
+last_short AS (
+    SELECT loan_id,
+           CASE WHEN paid_amount > 0 AND paid_amount < due_amount
+                THEN due_amount - paid_amount
+                ELSE 0 END                           AS short_paid
+    FROM last_due
 ),
 inst AS (
     SELECT DISTINCT ON (r.loan_id) r.loan_id,
@@ -104,7 +111,7 @@ SELECT
     --    far enough ahead owes nothing today, and a negative would read as if the branch owed them money.
     GREATEST(inst.installment_amount
              - sched.paid_in_advance
-             + sched.short_paid, 0)                   AS "ទឹកប្រាក់ត្រូវបង់",
+             + COALESCE(ls.short_paid,0), 0)                   AS "ទឹកប្រាក់ត្រូវបង់",
     -- 11 Type
     CASE ml.repayment_period_frequency_enum
          WHEN 0 THEN 'ថ្ងៃ' WHEN 1 THEN 'សប្តាហ៍'
@@ -125,8 +132,9 @@ SELECT
     -- 18 Over paid — already paid ahead, so the officer collects this much LESS today. Matches the
     --    "In advance" column of the loan's Repayment Schedule screen.
     sched.paid_in_advance                             AS "បង់លើស",
-    -- 19 Short paid — left over from an earlier collection, so the officer collects this much MORE today.
-    sched.short_paid                                  AS "បង់ខ្វះ",
+    -- 19 Short paid — the last due installment was only partly paid; collect the remainder MORE today.
+    --    0 when that installment was paid in full.
+    COALESCE(ls.short_paid,0)                         AS "បង់ខ្វះ",
     -- 20 Note — deliberately empty: the printed sheet carries a blank write-in column, as the original did.
     ''::text                                          AS "ចំណាំ",
     -- 21 Loan officer — header only. The PDF layout in sample/expect-repayment-template.sql lifts this column
@@ -140,6 +148,7 @@ JOIN m_client mc ON mc.office_id = ounder.id
 JOIN m_loan ml   ON ml.client_id = mc.id AND ml.loan_status_id = 300
 JOIN sched       ON sched.loan_id = ml.id
 JOIN inst        ON inst.loan_id  = ml.id
+LEFT JOIN last_short ls ON ls.loan_id = ml.id
 LEFT JOIN m_loan_arrears_aging mlaa ON mlaa.loan_id = ml.id
 LEFT JOIN m_staff ms ON ms.id = ml.loan_officer_id
 WHERE mo.id = '${officeId}'
