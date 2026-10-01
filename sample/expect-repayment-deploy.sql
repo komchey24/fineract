@@ -109,6 +109,14 @@ inst AS (
     FROM m_loan_repayment_schedule r
     WHERE r.installment > 0
     ORDER BY r.loan_id, r.installment
+),
+-- Working weekdays from the organisation's Working Days setting, e.g. 'FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,TU,WE'
+-- becomes {MO,TU,WE}. BYDAY is cut out first because the rest of the rule contains "FR" (in FREQ).
+workdays AS (
+    SELECT string_to_array(substring(w.recurrence FROM 'BYDAY=([A-Z,]+)'), ',') AS days
+    FROM m_working_days w
+    ORDER BY w.id
+    LIMIT 1
 )
 SELECT
     -- 1  No
@@ -148,8 +156,19 @@ SELECT
     CASE ml.repayment_period_frequency_enum
          WHEN 0 THEN 'ថ្ងៃ' WHEN 1 THEN 'សប្តាហ៍'
          WHEN 2 THEN 'ខែ'  WHEN 3 THEN 'ឆ្នាំ' END    AS "ប្រភេទកម្ចី",
-    -- 12 Late (days)
-    COALESCE(${endDate}::date - mlaa.overdue_since_date_derived, 0) AS "យឺត",
+    -- 12 Late (days) — working days only: each day after the loan fell overdue up to the report date,
+    --    skipping weekdays the organisation does not work (m_working_days) and active holidays of the
+    --    client's office. A loan that is not overdue generates no days and prints 0.
+    (SELECT COUNT(*)
+     FROM generate_series(mlaa.overdue_since_date_derived + 1, ${endDate}::date, INTERVAL '1 day') AS g(d)
+     WHERE (wd.days IS NULL
+            OR (ARRAY['MO','TU','WE','TH','FR','SA','SU'])[EXTRACT(ISODOW FROM g.d)::int] = ANY(wd.days))
+       AND NOT EXISTS (SELECT 1
+                       FROM m_holiday h
+                       JOIN m_holiday_office ho ON ho.holiday_id = h.id
+                       WHERE ho.office_id = mc.office_id
+                         AND h.status_enum = 300
+                         AND g.d::date BETWEEN h.from_date AND h.to_date)) AS "យឺត",
     -- 13 Paid installments
     sched.paid_installments                           AS "បង់រួច",
     -- 14 Unpaid installments
@@ -183,6 +202,7 @@ JOIN inst        ON inst.loan_id  = ml.id
 LEFT JOIN last_short ls ON ls.loan_id = ml.id
 LEFT JOIN m_loan_arrears_aging mlaa ON mlaa.loan_id = ml.id
 LEFT JOIN m_staff ms ON ms.id = ml.loan_officer_id
+LEFT JOIN workdays wd ON true
 WHERE mo.id = '${officeId}'
   AND (COALESCE(ml.loan_officer_id, -10) = ${loanOfficerId} OR ${loanOfficerId} = -1)
   AND ml.disbursedon_date >= ${startDate}::date - INTERVAL '10 years'
