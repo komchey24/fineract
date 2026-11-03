@@ -29,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.infrastructure.codes.data.CodeValueData;
 import org.apache.fineract.infrastructure.codes.service.CodeValueReadPlatformService;
 import org.apache.fineract.infrastructure.core.component.FetcherRule;
+import org.apache.fineract.infrastructure.core.domain.JdbcSupport;
 import org.apache.fineract.infrastructure.core.service.database.DatabaseSpecificSQLGenerator;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.apache.fineract.portfolio.address.data.AddressData;
@@ -64,8 +65,8 @@ public class AddressReadPlatformServiceImpl implements AddressReadPlatformServic
         @Override
         public AddressSuggestionData mapRow(final ResultSet rs, @SuppressWarnings("unused") final int rowNum) throws SQLException {
             return new AddressSuggestionData(rs.getString("address_line_1"), rs.getString("address_line_2"), rs.getString("address_line_3"),
-                    rs.getString("town_village"), rs.getString("county_district"), rs.getObject("state_province_id", Long.class),
-                    rs.getString("state_name"), rs.getObject("country_id", Long.class), rs.getString("country_name"));
+                    rs.getString("town_village"), rs.getString("county_district"), JdbcSupport.getLong(rs, "state_province_id"),
+                    rs.getString("state_name"), JdbcSupport.getLong(rs, "country_id"), rs.getString("country_name"));
         }
     }
 
