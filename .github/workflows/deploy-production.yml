@@ -1,14 +1,16 @@
 # Build the Fineract boot JAR and deploy it to the KC24 production host.
 #
-# Run manually: Actions -> "Deploy to Production" -> Run workflow (pick the branch).
+# Manual only: Actions -> "Deploy to Production" -> Run workflow (pick the branch).
+# Nothing triggers it automatically.
 #
 # Required setup (one-time):
 #   - Environment "production" with secret PROD_SSH_KEY: a private key whose public half
 #     is in ~ubuntu/.ssh/authorized_keys on the host (ubuntu has passwordless sudo).
 #   - Optionally add required reviewers to the "production" environment.
 #
-# On the host the previous JAR is kept as fineract-provider.jar.bak-<timestamp> (newest 5
-# kept). If the service is not healthy within the timeout, the previous JAR is restored.
+# Rollback: before installing, the running JAR is copied to fineract-provider.jar.last-good,
+# but only if the service is healthy at that moment. If the new JAR does not become healthy,
+# last-good is restored. Every deploy also keeps a timestamped .bak-* copy (newest 5).
 
 name: Deploy to Production
 
@@ -40,6 +42,25 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
           fetch-tags: true
+
+      # Fail fast: a malformed changelog stops Fineract from starting at all.
+      - name: Validate Liquibase changelog XML
+        run: |
+          git ls-files -z '*db/changelog/*.xml' '*db/custom-changelog/*.xml' | python3 -I -c '
+          import sys, xml.etree.ElementTree as ET
+          paths = [p for p in sys.stdin.read().split("\0") if p]
+          bad = 0
+          for p in paths:
+              try:
+                  root = ET.parse(p).getroot().tag.rsplit("}", 1)[-1]
+                  if root != "databaseChangeLog":
+                      raise ValueError(f"root element is <{root}>, expected <databaseChangeLog>")
+              except (ET.ParseError, ValueError) as e:
+                  bad += 1
+                  print(f"::error file={p}::{e}")
+          print(f"checked {len(paths)} changelog files, {bad} invalid")
+          sys.exit(1 if bad else 0)
+          '
 
       - name: Set up JDK 21
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
@@ -102,22 +123,33 @@ jobs:
           ssh "$PROD_HOST" 'bash -s' <<'REMOTE'
           set -euo pipefail
           JAR=/opt/fineract/fineract-provider.jar
+          LAST_GOOD=/opt/fineract/fineract-provider.jar.last-good
           NEW=/tmp/fineract-provider.jar.new
           HEALTH_URL=http://localhost:8080/fineract-provider/actuator/health
-          BACKUP="$JAR.bak-$(date +%Y%m%d-%H%M%S)"
+          TS=$(date +%Y%m%d-%H%M%S)
+
+          is_healthy() {
+            curl -sf "$HEALTH_URL" | grep -q '"status":"UP"'
+          }
 
           wait_healthy() {
             for _ in $(seq 1 72); do
-              if curl -sf "$HEALTH_URL" | grep -q '"status":"UP"'; then
-                return 0
-              fi
+              is_healthy && return 0
               sleep 5
             done
             return 1
           }
 
-          echo "==> Backing up current JAR to $BACKUP"
-          sudo cp -p "$JAR" "$BACKUP"
+          # Only a JAR seen healthy becomes the rollback target. If the service is down
+          # now, keep the previous last-good and label this backup as unhealthy.
+          if is_healthy; then
+            echo "==> Current service is UP; saving it as rollback target"
+            sudo cp -p "$JAR" "$LAST_GOOD"
+            sudo cp -p "$JAR" "$JAR.bak-$TS"
+          else
+            echo "::warning::Current service is NOT healthy; it will not be used for rollback"
+            sudo cp -p "$JAR" "$JAR.bak-$TS-unhealthy"
+          fi
           ls -1t "$JAR".bak-* | tail -n +6 | xargs -r sudo rm -f --
 
           echo "==> Installing new JAR and restarting fineract"
@@ -131,14 +163,21 @@ jobs:
             exit 0
           fi
 
-          echo "::error::Service did not become healthy; rolling back to $BACKUP"
-          sudo journalctl -u fineract -n 200 --no-pager || true
-          sudo cp -p "$BACKUP" "$JAR"
+          echo "::error::New JAR did not become healthy"
+          sudo journalctl -u fineract --since "-7 min" --no-pager | grep -E "ERROR|Caused by" | cut -c1-400 | head -40 || true
+
+          if [[ ! -f "$LAST_GOOD" ]]; then
+            echo "::error::No last-good JAR on the host, so nothing to roll back to; fix the host manually"
+            exit 1
+          fi
+
+          echo "==> Rolling back to $LAST_GOOD"
+          sudo install -o fineract -g fineract -m 644 "$LAST_GOOD" "$JAR"
           sudo systemctl restart fineract
           if wait_healthy; then
-            echo "==> Rolled back; previous version is UP"
+            echo "::error::Deploy failed; rolled back to last-good JAR, which is UP"
           else
-            echo "::error::Rollback also failed to become healthy, check the host"
+            echo "::error::Deploy failed and the last-good JAR is not healthy either; check the host"
           fi
           exit 1
           REMOTE
