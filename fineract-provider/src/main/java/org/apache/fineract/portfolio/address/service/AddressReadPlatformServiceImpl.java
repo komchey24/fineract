@@ -25,11 +25,14 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.infrastructure.codes.data.CodeValueData;
 import org.apache.fineract.infrastructure.codes.service.CodeValueReadPlatformService;
 import org.apache.fineract.infrastructure.core.component.FetcherRule;
+import org.apache.fineract.infrastructure.core.service.database.DatabaseSpecificSQLGenerator;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.apache.fineract.portfolio.address.data.AddressData;
+import org.apache.fineract.portfolio.address.data.AddressSuggestionData;
 import org.apache.fineract.portfolio.address.filter.ClientAddressSearchParam;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -42,6 +45,29 @@ public class AddressReadPlatformServiceImpl implements AddressReadPlatformServic
     private final JdbcTemplate jdbcTemplate;
     private final PlatformSecurityContext context;
     private final CodeValueReadPlatformService readService;
+    private final DatabaseSpecificSQLGenerator sqlGenerator;
+
+    static final int DEFAULT_SEARCH_LIMIT = 10;
+    static final int MAX_SEARCH_LIMIT = 50;
+
+    private static final class AddressSuggestionMapper implements RowMapper<AddressSuggestionData> {
+
+        public String schema() {
+            return "distinct addr.address_line_1 as address_line_1, addr.address_line_2 as address_line_2,"
+                    + " addr.address_line_3 as address_line_3, addr.town_village as town_village, addr.county_district as county_district,"
+                    + " addr.state_province_id as state_province_id, cv.code_value as state_name,"
+                    + " addr.country_id as country_id, c.code_value as country_name"
+                    + " from m_address addr left join m_code_value cv on addr.state_province_id = cv.id"
+                    + " left join m_code_value c on addr.country_id = c.id";
+        }
+
+        @Override
+        public AddressSuggestionData mapRow(final ResultSet rs, @SuppressWarnings("unused") final int rowNum) throws SQLException {
+            return new AddressSuggestionData(rs.getString("address_line_1"), rs.getString("address_line_2"), rs.getString("address_line_3"),
+                    rs.getString("town_village"), rs.getString("county_district"), rs.getObject("state_province_id", Long.class),
+                    rs.getString("state_name"), rs.getObject("country_id", Long.class), rs.getString("country_name"));
+        }
+    }
 
     private static final class AddFieldsMapper implements RowMapper<AddressData> {
 
@@ -235,6 +261,34 @@ public class AddressReadPlatformServiceImpl implements AddressReadPlatformServic
         final List<CodeValueData> addressTypeOptions = this.readService.retrieveCodeValuesByCode("ADDRESS_TYPE");
 
         return AddressData.template(countryoptions, StateOptions, addressTypeOptions);
+    }
+
+    @Override
+    public List<AddressSuggestionData> searchByAddressLine1Prefix(final String prefix, final Integer limit) {
+        this.context.authenticatedUser();
+        final String trimmedPrefix = StringUtils.trimToEmpty(prefix);
+        if (trimmedPrefix.isEmpty()) {
+            return List.of();
+        }
+        final AddressSuggestionMapper rm = new AddressSuggestionMapper();
+        final String sql = "select " + rm.schema() + " where addr.address_line_1 like ? order by addr.address_line_1, addr.address_line_2,"
+                + " addr.address_line_3 " + this.sqlGenerator.limit(clampSearchLimit(limit));
+        return this.jdbcTemplate.query(sql, rm, escapeLikeWildcards(trimmedPrefix) + "%"); // NOSONAR
+    }
+
+    static int clampSearchLimit(final Integer limit) {
+        if (limit == null || limit < 1) {
+            return DEFAULT_SEARCH_LIMIT;
+        }
+        return Math.min(limit, MAX_SEARCH_LIMIT);
+    }
+
+    /**
+     * Escapes LIKE wildcards so user input is matched literally. Backslash is the default LIKE escape character in both
+     * PostgreSQL and MySQL.
+     */
+    static String escapeLikeWildcards(final String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     private List<FetcherRule<ClientAddressSearchParam, List<AddressData>>> getFilterRules() {
