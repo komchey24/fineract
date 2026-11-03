@@ -1,0 +1,150 @@
+# Build the Fineract boot JAR and deploy it to the KC24 production host.
+#
+# Run manually: Actions -> "Deploy to Production" -> Run workflow (pick the branch).
+#
+# Required setup (one-time):
+#   - Environment "production" with secret PROD_SSH_KEY: a private key whose public half
+#     is in ~ubuntu/.ssh/authorized_keys on the host (ubuntu has passwordless sudo).
+#   - Optionally add required reviewers to the "production" environment.
+#
+# On the host the previous JAR is kept as fineract-provider.jar.bak-<timestamp> (newest 5
+# kept). If the service is not healthy within the timeout, the previous JAR is restored.
+
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: production
+
+    env:
+      PROD_HOST: ubuntu@208.122.28.192
+      # Public host key, pinned so the runner never trusts an unknown server.
+      PROD_KNOWN_HOSTS: 208.122.28.192 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGOusg3DDq4a38Q8wr3MIkRhcCk7TRP3visKlAfrEgBv
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
+        with:
+          java-version: '21'
+          distribution: 'zulu'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+        with:
+          validate-wrappers: true
+
+      - name: Build boot JAR
+        run: |
+          ./gradlew --no-daemon --console=plain :fineract-avro-schemas:buildJavaSdk
+          ./gradlew --no-daemon --console=plain :fineract-provider:bootJar -x test
+
+      - name: Locate JAR
+        id: jar
+        run: |
+          jar=$(find fineract-provider/build/libs -maxdepth 1 -name 'fineract-provider-*.jar' ! -name '*-plain.jar' | head -1)
+          if [[ -z "$jar" ]]; then
+            echo "::error::No boot JAR found in fineract-provider/build/libs"
+            exit 1
+          fi
+          ls -la "$jar"
+          echo "path=$jar" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "$jar" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure SSH
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+        run: |
+          if [[ -z "$PROD_SSH_KEY" ]]; then
+            echo "::error::Secret PROD_SSH_KEY is not set on the production environment"
+            exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$PROD_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$PROD_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<'EOF'
+          Host *
+            IdentityFile ~/.ssh/id_deploy
+            IdentitiesOnly yes
+            BatchMode yes
+            StrictHostKeyChecking yes
+            ServerAliveInterval 30
+          EOF
+          ssh "$PROD_HOST" 'echo connected to $(hostname)'
+
+      - name: Upload JAR
+        env:
+          JAR_PATH: ${{ steps.jar.outputs.path }}
+          JAR_SHA256: ${{ steps.jar.outputs.sha256 }}
+        run: |
+          scp "$JAR_PATH" "$PROD_HOST:/tmp/fineract-provider.jar.new"
+          ssh "$PROD_HOST" "echo '$JAR_SHA256  /tmp/fineract-provider.jar.new' | sha256sum -c -"
+
+      - name: Install and restart
+        run: |
+          ssh "$PROD_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          JAR=/opt/fineract/fineract-provider.jar
+          NEW=/tmp/fineract-provider.jar.new
+          HEALTH_URL=http://localhost:8080/fineract-provider/actuator/health
+          BACKUP="$JAR.bak-$(date +%Y%m%d-%H%M%S)"
+
+          wait_healthy() {
+            for _ in $(seq 1 72); do
+              if curl -sf "$HEALTH_URL" | grep -q '"status":"UP"'; then
+                return 0
+              fi
+              sleep 5
+            done
+            return 1
+          }
+
+          echo "==> Backing up current JAR to $BACKUP"
+          sudo cp -p "$JAR" "$BACKUP"
+          ls -1t "$JAR".bak-* | tail -n +6 | xargs -r sudo rm -f --
+
+          echo "==> Installing new JAR and restarting fineract"
+          sudo install -o fineract -g fineract -m 644 "$NEW" "$JAR"
+          rm -f "$NEW"
+          sudo systemctl restart fineract
+
+          echo "==> Waiting for health check (up to 6 minutes)"
+          if wait_healthy; then
+            echo "==> Deployment successful, service is UP"
+            exit 0
+          fi
+
+          echo "::error::Service did not become healthy; rolling back to $BACKUP"
+          sudo journalctl -u fineract -n 200 --no-pager || true
+          sudo cp -p "$BACKUP" "$JAR"
+          sudo systemctl restart fineract
+          if wait_healthy; then
+            echo "==> Rolled back; previous version is UP"
+          else
+            echo "::error::Rollback also failed to become healthy, check the host"
+          fi
+          exit 1
+          REMOTE
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_deploy
