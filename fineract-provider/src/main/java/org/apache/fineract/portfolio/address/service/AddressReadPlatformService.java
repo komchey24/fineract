@@ -20,6 +20,7 @@ package org.apache.fineract.portfolio.address.service;
 
 import java.util.List;
 import org.apache.fineract.portfolio.address.data.AddressData;
+import org.apache.fineract.portfolio.address.data.AddressSuggestionData;
 import org.apache.fineract.portfolio.address.filter.ClientAddressSearchParam;
 
 public interface AddressReadPlatformService {
@@ -37,4 +38,14 @@ public interface AddressReadPlatformService {
     List<AddressData> retrieveBySearchParam(ClientAddressSearchParam searchFilter);
 
     AddressData retrieveTemplate();
+
+    /**
+     * Returns distinct existing address hierarchies whose address line 1 (village) starts with the given prefix.
+     *
+     * @param prefix
+     *            address line 1 prefix; blank returns an empty list
+     * @param limit
+     *            maximum number of rows, defaults to 10 and is capped at 50
+     */
+    List<AddressSuggestionData> searchByAddressLine1Prefix(String prefix, Integer limit);
 }

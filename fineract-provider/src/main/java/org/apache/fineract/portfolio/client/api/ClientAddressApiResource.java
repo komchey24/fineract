@@ -44,6 +44,7 @@ import org.apache.fineract.infrastructure.core.data.CommandProcessingResult;
 import org.apache.fineract.infrastructure.core.serialization.DefaultToApiJsonSerializer;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.apache.fineract.portfolio.address.data.AddressData;
+import org.apache.fineract.portfolio.address.data.AddressSuggestionData;
 import org.apache.fineract.portfolio.address.filter.ClientAddressSearchParam;
 import org.apache.fineract.portfolio.address.service.AddressReadPlatformServiceImpl;
 import org.apache.fineract.portfolio.client.data.ClientAddressRequest;
@@ -70,6 +71,23 @@ public class ClientAddressApiResource {
         context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
         return readPlatformService.retrieveTemplate();
 
+    }
+
+    @GET
+    @Path("addresses/search")
+    @Produces({ MediaType.APPLICATION_JSON })
+    @Operation(summary = "Search existing addresses by address line 1 prefix", operationId = "searchClientAddresses", description = """
+            Returns distinct existing address hierarchies (address line 1-3, town/village, county/district, state/province, country)
+            whose address line 1 starts with the given prefix. Used to pre-fill a new client address.
+
+            Example Requests:
+
+            client/addresses/search?prefix=abc&limit=10""")
+    public List<AddressSuggestionData> searchAddresses(
+            @QueryParam("prefix") @Parameter(description = "address line 1 prefix") final String prefix,
+            @QueryParam("limit") @Parameter(description = "maximum number of results (default 10, max 50)") final Integer limit) {
+        context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
+        return readPlatformService.searchByAddressLine1Prefix(prefix, limit);
     }
 
     @POST
