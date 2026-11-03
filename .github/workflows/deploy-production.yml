@@ -53,9 +53,7 @@ jobs:
           validate-wrappers: true
 
       - name: Build boot JAR
-        run: |
-          ./gradlew --no-daemon --console=plain :fineract-avro-schemas:buildJavaSdk
-          ./gradlew --no-daemon --console=plain :fineract-provider:bootJar -x test
+        run: ./gradlew --no-daemon --console=plain :fineract-provider:bootJar -x test
 
       - name: Locate JAR
         id: jar
