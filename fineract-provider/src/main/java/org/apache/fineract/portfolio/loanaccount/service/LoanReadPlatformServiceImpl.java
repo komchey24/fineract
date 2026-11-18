@@ -102,6 +102,7 @@ import org.apache.fineract.portfolio.loanaccount.data.LoanApplicationTimelineDat
 import org.apache.fineract.portfolio.loanaccount.data.LoanApprovalData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanChargePaidByData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanInterestRecalculationData;
+import org.apache.fineract.portfolio.loanaccount.data.LoanRepaymentData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanRepaymentScheduleInstallmentData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanStatusEnumData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanSummaryData;
@@ -222,6 +223,43 @@ public class LoanReadPlatformServiceImpl implements LoanReadPlatformService, Loa
         } catch (final EmptyResultDataAccessException e) {
             throw new LoanNotFoundException(loanId, e);
         }
+    }
+
+    @Override
+    public List<LoanRepaymentData> retrieveRepayments(final LocalDate date, final Long loanOfficerId) {
+        final List<Object> params = new ArrayList<>(List.of(LoanTransactionType.REPAYMENT.getValue(), date, getHierarchyString() + "%"));
+        String sql = "select t.id as transactionId, l.id as loanId, l.account_no as loanAccountNo, l.client_id as clientId,"
+                + " c.display_name as clientName, l.loan_officer_id as loanOfficerId, s.display_name as loanOfficerName,"
+                + " t.transaction_date as transactionDate, t.amount as amount, t.principal_portion_derived as principalPortion,"
+                + " t.interest_portion_derived as interestPortion, t.fee_charges_portion_derived as feeChargesPortion,"
+                + " t.penalty_charges_portion_derived as penaltyChargesPortion, t.overpayment_portion_derived as overpaymentPortion,"
+                + " pt.id as paymentTypeId, pt.value as paymentTypeName" //
+                + " from m_loan_transaction t" //
+                + " join m_loan l on l.id = t.loan_id" //
+                + " join m_office o on o.id = t.office_id" //
+                + " left join m_client c on c.id = l.client_id" //
+                + " left join m_staff s on s.id = l.loan_officer_id" //
+                + " left join m_payment_detail pd on pd.id = t.payment_detail_id" //
+                + " left join m_payment_type pt on pt.id = pd.payment_type_id"
+                + " where t.transaction_type_enum = ? and t.is_reversed = false and t.transaction_date = ? and o.hierarchy like ?";
+        if (loanOfficerId != null) {
+            sql += " and l.loan_officer_id = ?";
+            params.add(loanOfficerId);
+        }
+        return this.jdbcTemplate.query(sql + " order by t.id", LoanReadPlatformServiceImpl::mapRepayment, params.toArray()); // NOSONAR
+    }
+
+    private static LoanRepaymentData mapRepayment(final ResultSet rs, @SuppressWarnings("unused") final int rowNum) throws SQLException {
+        return new LoanRepaymentData(JdbcSupport.getLong(rs, "transactionId"), JdbcSupport.getLong(rs, "loanId"),
+                rs.getString("loanAccountNo"), JdbcSupport.getLong(rs, "clientId"), rs.getString("clientName"),
+                JdbcSupport.getLong(rs, "loanOfficerId"), rs.getString("loanOfficerName"),
+                JdbcSupport.getLocalDate(rs, "transactionDate").toString(), JdbcSupport.getBigDecimalDefaultToZeroIfNull(rs, "amount"),
+                JdbcSupport.getBigDecimalDefaultToZeroIfNull(rs, "principalPortion"),
+                JdbcSupport.getBigDecimalDefaultToZeroIfNull(rs, "interestPortion"),
+                JdbcSupport.getBigDecimalDefaultToZeroIfNull(rs, "feeChargesPortion"),
+                JdbcSupport.getBigDecimalDefaultToZeroIfNull(rs, "penaltyChargesPortion"),
+                JdbcSupport.getBigDecimalDefaultToZeroIfNull(rs, "overpaymentPortion"), JdbcSupport.getLong(rs, "paymentTypeId"),
+                rs.getString("paymentTypeName"));
     }
 
     private String getHierarchyString() {

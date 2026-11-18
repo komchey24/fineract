@@ -41,6 +41,7 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.UriInfo;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -56,9 +57,11 @@ import org.apache.fineract.infrastructure.core.annotation.AlternativeOperationId
 import org.apache.fineract.infrastructure.core.api.ApiRequestParameterHelper;
 import org.apache.fineract.infrastructure.core.api.DateParam;
 import org.apache.fineract.infrastructure.core.api.jersey.Pagination;
+import org.apache.fineract.infrastructure.core.data.ApiParameterError;
 import org.apache.fineract.infrastructure.core.data.CommandProcessingResult;
 import org.apache.fineract.infrastructure.core.data.DateFormat;
 import org.apache.fineract.infrastructure.core.domain.ExternalId;
+import org.apache.fineract.infrastructure.core.exception.PlatformApiDataValidationException;
 import org.apache.fineract.infrastructure.core.exception.UnrecognizedQueryParamException;
 import org.apache.fineract.infrastructure.core.serialization.ApiRequestJsonSerializationSettings;
 import org.apache.fineract.infrastructure.core.serialization.DefaultToApiJsonSerializer;
@@ -68,6 +71,7 @@ import org.apache.fineract.infrastructure.core.service.ExternalIdFactory;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.apache.fineract.portfolio.loanaccount.api.request.ReAgePreviewRequest;
 import org.apache.fineract.portfolio.loanaccount.api.request.ReAmortizationPreviewRequest;
+import org.apache.fineract.portfolio.loanaccount.data.LoanRepaymentData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanRepaymentScheduleInstallmentData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanTransactionData;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionType;
@@ -115,6 +119,34 @@ public class LoanTransactionsApiResource {
     private final LoanChargePaidByReadService loanChargePaidByReadService;
     private final LoanReAgingService loanReAgingService;
     private final LoanReAmortizationService loanReAmortizationService;
+
+    @GET
+    @Path("repayments")
+    @Produces({ MediaType.APPLICATION_JSON })
+    @Operation(summary = "List repayments for a date", operationId = "retrieveLoanRepayments", description = """
+            Returns the non-reversed repayments booked on a transaction date, with their principal, interest, fee, penalty and
+            overpayment portions. Optionally limited to loans currently assigned to one loan officer.
+
+            Example Requests:
+
+            loans/repayments?date=2026-11-17
+
+            loans/repayments?date=2026-11-17&loanOfficerId=3""")
+    public List<LoanRepaymentData> retrieveRepayments(
+            @QueryParam("date") @Parameter(description = "transaction date, yyyy-MM-dd", required = true) final String date,
+            @QueryParam("loanOfficerId") @Parameter(description = "loan officer (staff) id") final Long loanOfficerId) {
+        context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
+        return loanReadPlatformService.retrieveRepayments(parseRepaymentDate(date), loanOfficerId);
+    }
+
+    static LocalDate parseRepaymentDate(final String date) {
+        try {
+            return LocalDate.parse(StringUtils.defaultString(date));
+        } catch (final DateTimeParseException e) {
+            throw new PlatformApiDataValidationException(List.of(
+                    ApiParameterError.parameterError("validation.msg.loan.repayments.date.invalid", "date must be yyyy-MM-dd", "date")), e);
+        }
+    }
 
     @GET
     @Path("{loanId}/transactions/template")
