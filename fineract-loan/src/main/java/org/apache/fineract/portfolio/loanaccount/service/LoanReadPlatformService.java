@@ -32,6 +32,7 @@ import org.apache.fineract.portfolio.floatingrates.data.InterestRatePeriodData;
 import org.apache.fineract.portfolio.loanaccount.data.DisbursementData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanAccountData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanApprovalData;
+import org.apache.fineract.portfolio.loanaccount.data.LoanRepaymentData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanRepaymentScheduleInstallmentData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanTransactionData;
 import org.apache.fineract.portfolio.loanaccount.data.PaidInAdvanceData;
@@ -48,6 +49,9 @@ import org.springframework.lang.NonNull;
 public interface LoanReadPlatformService {
 
     LoanAccountData retrieveOne(Long loanId);
+
+    /** Non-reversed repayments on {@code date}, optionally only for loans currently assigned to one officer. */
+    List<LoanRepaymentData> retrieveRepayments(LocalDate date, Long loanOfficerId);
 
     LoanAccountData fetchRepaymentScheduleData(LoanAccountData accountData);
 
